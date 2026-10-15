@@ -40,6 +40,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
@@ -67,6 +68,9 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
 import com.duckduckgo.anvil.annotations.InjectWith
 import com.duckduckgo.app.automation.AutomationEngine
+import com.duckduckgo.app.automation.RotationMode
+import com.duckduckgo.app.automation.SiteProfileRepository
+import com.duckduckgo.app.automation.VaultRepository
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.browser.SmoothProgressAnimator
 import com.duckduckgo.app.browser.api.OmnibarRepository
@@ -499,7 +503,6 @@ class OmnibarLayout @JvmOverloads constructor(
         findInPage.findInPageContainer.viewTreeObserver.addOnGlobalLayoutListener(findInPageLayoutVisibilityChangeListener)
         AutomationEngine.detectedFieldCount.observeForever(detectedFieldsObserver)
 
-        // Force our robot icon on the address bar slot
         (aiChatMenu as? ImageView)?.let { iv ->
             iv.setImageResource(CommonR.drawable.ic_automation_24)
             iv.setColorFilter(context.getColorFromAttr(CommonR.attr.daxColorPrimaryIcon))
@@ -609,6 +612,7 @@ class OmnibarLayout @JvmOverloads constructor(
 
     override fun setOmnibarItemPressedListener(itemPressedListener: ItemPressedListener) {
         omnibarItemPressedListener = itemPressedListener
+
         tabsMenu.setOnClickListener {
             omnibarItemPressedListener?.onTabsButtonPressed()
         }
@@ -628,63 +632,18 @@ class OmnibarLayout @JvmOverloads constructor(
         browserMenu.setOnClickListener {
             omnibarItemPressedListener?.onBrowserMenuPressed()
         }
-                aiChatMenu?.setOnClickListener {
+
+        // Short tap: fill the current page with the default/pinned group
+        aiChatMenu?.setOnClickListener {
             AutomationEngine.fillCurrentPage()
         }
-              
+
+        // Long press: open the DDG-styled automation menu
         aiChatMenu?.setOnLongClickListener { anchor ->
-            val popup = android.widget.PopupMenu(context, anchor)
-            val domain = AutomationEngine.currentDomain().ifBlank { "this site" }
-            val teachLabel = if (AutomationEngine.isTeachModeActive) {
-                "Stop Teach Mode"
-            } else {
-                "🎯 Teach Mode (Tap Elements to Learn)"
-            }
-            val modeName = if (
-                com.duckduckgo.app.automation.SiteProfileRepository.rotationMode ==
-                com.duckduckgo.app.automation.RotationMode.SEQUENTIAL
-            ) {
-                "🔄 Mode: 1-by-1 from Top (Tap for Random)"
-            } else {
-                "🎲 Mode: Random (Tap for 1-by-1)"
-            }
-
-            popup.menu.add(0, 1, 0, teachLabel)
-            popup.menu.add(0, 2, 1, modeName)
-            popup.menu.add(0, 3, 2, "⏮️ Reset Data Counter to #1 for $domain")
-            popup.menu.add(0, 4, 3, "🔍 Re-scan Page")
-            popup.menu.add(0, 5, 4, "🗑️ Clear Learned Rules for $domain")
-
-            val groups = com.duckduckgo.app.automation.VaultRepository.groups.value
-            groups.forEachIndexed { index, group ->
-                val pinPrefix = if (group.pinned) "★ " else ""
-                val usedCount = com.duckduckgo.app.automation.SiteProfileRepository.getUsedCountForSite(domain, group.name)
-                popup.menu.add(1, 100 + index, 10 + index, "Fill: $pinPrefix${group.name} (Used: $usedCount)")
-            }
-
-            popup.setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    1 -> AutomationEngine.toggleTeachMode()
-                    2 -> AutomationEngine.toggleRotationMode()
-                    3 -> AutomationEngine.resetCurrentSiteRotation()
-                    4 -> AutomationEngine.injectScanner()
-                    5 -> AutomationEngine.clearCurrentSiteProfile()
-                    else -> {
-                        val groupIdx = item.itemId - 100
-                        val chosen = groups.getOrNull(groupIdx)
-                        if (chosen != null) {
-                            AutomationEngine.fillCurrentPage(chosen.name)
-                        }
-                    }
-                }
-                true
-            }
-            popup.show()
+            showAutomationMenu(anchor)
             true
         }
 
-
-        
         shieldIcon.setOnClickListener {
             if (isAttachedToWindow) {
                 viewModel.onPrivacyShieldButtonPressed()
@@ -712,6 +671,65 @@ class OmnibarLayout @JvmOverloads constructor(
         duckAIBack.setOnClickListener {
             omnibarItemPressedListener?.onDuckAIBackButtonPressed()
         }
+    }
+
+    /**
+     * Show the DDG-styled automation popup menu.
+     *
+     * Groups:
+     *  1. Automation controls (teach mode, rotation, reset, rescan, clear)
+     *  2. Fill actions (one entry per saved data group)
+     */
+    private fun showAutomationMenu(anchor: View) {
+        val popup = PopupMenu(context, anchor)
+        val domain = AutomationEngine.currentDomain().ifBlank { "this site" }
+
+        val teachLabel = if (AutomationEngine.isTeachModeActive.value) {
+            "Stop teach mode"
+        } else {
+            "Teach mode"
+        }
+
+        val modeLabel = if (SiteProfileRepository.rotationMode == RotationMode.SEQUENTIAL) {
+            "Rotation: 1-by-1"
+        } else {
+            "Rotation: random"
+        }
+
+        // Section 1: Automation controls
+        popup.menu.add(0, MENU_TEACH_MODE, 0, teachLabel)
+        popup.menu.add(0, MENU_ROTATION_MODE, 1, modeLabel)
+        popup.menu.add(0, MENU_RESET_COUNTER, 2, "Reset counter for $domain")
+        popup.menu.add(0, MENU_RESCAN_PAGE, 3, "Rescan page")
+        popup.menu.add(0, MENU_CLEAR_RULES, 4, "Clear learned rules")
+
+        // Section 2: Fill actions
+        val groups = VaultRepository.groups.value
+        groups.forEachIndexed { index, group ->
+            val pin = if (group.pinned) "\u2605 " else ""
+            val used = SiteProfileRepository.getUsedCountForSite(domain, group.name)
+            val itemId = MENU_FILL_BASE + index
+            val groupId = if (index == 0) GROUP_FILL else 0
+            popup.menu.add(groupId, itemId, 10 + index, "Fill: $pin${group.name} ($used used)")
+        }
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                MENU_TEACH_MODE -> AutomationEngine.toggleTeachMode()
+                MENU_ROTATION_MODE -> AutomationEngine.toggleRotationMode()
+                MENU_RESET_COUNTER -> AutomationEngine.resetCurrentSiteRotation()
+                MENU_RESCAN_PAGE -> AutomationEngine.injectScanner()
+                MENU_CLEAR_RULES -> AutomationEngine.clearCurrentSiteProfile()
+                else -> {
+                    val idx = item.itemId - MENU_FILL_BASE
+                    groups.getOrNull(idx)?.let { group ->
+                        AutomationEngine.fillCurrentPage(group.name)
+                    }
+                }
+            }
+            true
+        }
+        popup.show()
     }
 
     override fun setLogoClickListener(logoClickListener: LogoClickListener) {
@@ -773,7 +791,6 @@ class OmnibarLayout @JvmOverloads constructor(
 
     private fun renderPosition() {
         if (omnibarType == OmnibarType.SINGLE_BOTTOM) {
-            // When omnibar is at the bottom, we're adding an additional space at the top
             omnibarCardShadow.updateLayoutParams {
                 flipOmnibarMargins()
             }
@@ -919,7 +936,7 @@ class OmnibarLayout @JvmOverloads constructor(
                         .load(CommonR.drawable.ic_ddg_logo)
                         .transition(withCrossFade())
                         .placeholder(daxIcon.drawable)
-                        .listener(null) // Clear any previous listener from EasterEggLogo
+                        .listener(null)
                         .into(this)
                 }
                 shieldIcon.gone()
@@ -1002,11 +1019,6 @@ class OmnibarLayout @JvmOverloads constructor(
         clearTextButton.isVisible = viewState.showClearButton
         voiceSearchButton.isVisible = viewState.showVoiceSearch
         tabsMenu.isVisible = newTransitionState.showTabsMenu
-        // The fire/+ slot is shared: in a Duck.ai chat the + icon takes over from fire as the
-        // leading action, but only when the native input field is enabled. Users with the
-        // nativeInputField flag off keep the fire button even in a Duck.ai view. Driven by
-        // viewMode (plus the flag) rather than a separate state flag so it can't drift out of
-        // sync with other state-update paths.
         fireIconMenu.isVisible = shouldShowFireIcon(
             showFireIcon = newTransitionState.showFireIcon,
             isDuckAiMode = newTransitionState.isDuckAiMode,
@@ -1017,7 +1029,6 @@ class OmnibarLayout @JvmOverloads constructor(
             isDuckAiMode = newTransitionState.isDuckAiMode,
             isNativeChatInputEnabled = newTransitionState.isNativeChatInputEnabled,
         )
-        // Icon visibility is driven by AutomationEngine.detectedFieldCount observer
         aiChatMenu?.isVisible = showAutomationIcon
         browserMenu.isVisible = newTransitionState.showBrowserMenu
         browserMenuHighlight.isVisible = newTransitionState.showBrowserMenuHighlight
@@ -1048,9 +1059,6 @@ class OmnibarLayout @JvmOverloads constructor(
     }
 
     private fun renderBrowserMode(viewState: ViewState) {
-        // Custom Tab / find-in-page hide the address field. Browser mode must put it back — otherwise
-        // a prior hide leaves an empty toolbar strip with only the trailing icons (especially noticeable
-        // with a bottom omnibar after tab swipe).
         ensureBrowserAddressFieldVisible()
 
         renderOutline(viewState.hasFocus)
@@ -1077,7 +1085,6 @@ class OmnibarLayout @JvmOverloads constructor(
         if (viewState.isAddressBarTrackersAnimationEnabled) {
             shieldIconPulseAnimationContainer.updateLayoutParams {
                 (this as MarginLayoutParams).apply {
-                    // TODO when the animation is made permanent we should add this adjustment to the actual layout
                     marginStart = 1.toPx()
                 }
             }
@@ -1104,9 +1111,6 @@ class OmnibarLayout @JvmOverloads constructor(
         logcat { "Omnibar: renderDuckAiMode $viewState" }
         renderTabIcon(viewState)
         renderOmnibarText(viewState)
-        // The shield sits outside omnibarIconContainer, so the leadingIconContainer hide in
-        // render() doesn't cover it — clear any shield left over from the previous browser page
-        // so it doesn't show alongside the Duck.ai header.
         shieldIcon.gone()
         if (viewState.isProgressBarUpgradeEnabled) {
             updatePageLoadProgressBar(viewState)
@@ -1145,9 +1149,6 @@ class OmnibarLayout @JvmOverloads constructor(
         if (isAttachedToWindow) {
             decorateDeferred(decoration)
         } else {
-            /* TODO (cbarreiro): This is a temporary solution to prevent one-time decorations causing mode to be lost when view is not attached
-             *  As a long-term solution, we should move mode to StateChange, and only have one-time decorations here
-             */
             if (decoration is Mode) {
                 val lastMode = lastViewMode?.viewMode
                 if (lastMode !is ViewMode.CustomTab) {
@@ -1371,7 +1372,6 @@ class OmnibarLayout @JvmOverloads constructor(
                 }
 
             val useLightAnimation = when {
-                // Fire mode forces a dark omnibar even in light app theme — use the dark shield
                 browserMode == BrowserMode.FIRE -> false
                 viewMode is ViewMode.CustomTab &&
                     shouldUseCustomTabToolbarColorForShield(
@@ -1379,7 +1379,7 @@ class OmnibarLayout @JvmOverloads constructor(
                         isNewCustomTabEnabled = omnibarRepository.isNewCustomTabEnabled,
                         isDefaultToolbarColor = isDefaultToolbarColor(viewMode.toolbarColor),
                     ) -> isColorLight(viewMode.toolbarColor)
-                else -> null // Use default theme-based selection
+                else -> null
             }
 
             val boxed = privacyShieldView.setAnimationView(
@@ -1505,10 +1505,6 @@ class OmnibarLayout @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Flip the top and bottom margins of the toolbar layout params.
-     * Used when the omnibar is positioned at the bottom.
-     */
     private fun ViewGroup.LayoutParams.flipOmnibarMargins() {
         (this as MarginLayoutParams).apply {
             topMargin = omnibarCardMarginBottom
@@ -1529,14 +1525,8 @@ class OmnibarLayout @JvmOverloads constructor(
             val hsl = floatArrayOf(0f, 0f, 0f)
             ColorUtils.colorToHSL(mainToolbarColor, hsl)
 
-            // hsl[0] is Hue (H) - keep this the same to maintain color identity
-            // hsl[1] is Saturation (S) - reduce for muted appearance
-            // hsl[2] is Lightness (L) - increase for lighter shade
-
-            // If the original color is grayscale (near-zero saturation),
-            // keep it grayscale to maintain color identity
             if (hsl[1] < 0.01f) {
-                hsl[1] = 0f // Keep saturation at 0
+                hsl[1] = 0f
             } else {
                 hsl[1] = targetSaturation
             }
@@ -1544,7 +1534,6 @@ class OmnibarLayout @JvmOverloads constructor(
 
             ColorUtils.HSLToColor(hsl)
         } else {
-            // Use a darkened version of the main toolbar color for dark themes
             ColorUtils.blendARGB(mainToolbarColor, Color.WHITE, 0.20f)
         }
     }
@@ -1595,7 +1584,6 @@ class OmnibarLayout @JvmOverloads constructor(
     }
 
     private fun calculateCustomTabBackgroundColor(color: Int): Int {
-        // Handle the case where we did not receive a color.
         if (color == 0) {
             return if ((context as DuckDuckGoActivity).isDarkThemeEnabled()) Color.WHITE else Color.BLACK
         }
@@ -1625,9 +1613,7 @@ class OmnibarLayout @JvmOverloads constructor(
             return true
         }
 
-        // Use W3C relative luminance calculation
         val luminance = ColorUtils.calculateLuminance(color)
-        // Use 0.5 threshold - lighter backgrounds have higher luminance
         return luminance > 0.5
     }
 
@@ -1640,9 +1626,9 @@ class OmnibarLayout @JvmOverloads constructor(
 
             val foregroundColor = if (isColorLight) Color.BLACK else Color.WHITE
             val hintColor = if (foregroundColor == Color.WHITE) {
-                Color.argb(153, 255, 255, 255) // 60% white for dark theme
+                Color.argb(153, 255, 255, 255)
             } else {
-                Color.argb(153, 0, 0, 0) // 60% black for light theme
+                Color.argb(153, 0, 0, 0)
             }
 
             findInPageInput.setTextColor(foregroundColor)
@@ -1775,11 +1761,8 @@ class OmnibarLayout @JvmOverloads constructor(
         applyEnabled(fireIconMenu, fireEnabled)
         omnibarTextInput.alpha = if (nonFireEnabled) 1.0f else LOCKED_INPUT_ALPHA
 
-        // Show the click catcher whenever a click catcher is requested OR the omnibar is
-        // locked (so the locked state can intercept and ignore the click).
         enableTextInputClickCatcher(viewState.showTextInputClickCatcher || isLocked)
 
-        // When locked, the click catcher should not launch the input screen.
         if (isLocked) {
             omnibarTextInputClickCatcher.setOnClickListener(null)
         } else if (omnibarNativeInputLaunchListener != null) {
@@ -1798,12 +1781,8 @@ class OmnibarLayout @JvmOverloads constructor(
     }
 
     private fun applyAiChatMenuStyling(showContextualSheetIcon: Boolean) {
-        // renderButtons fires on every view-state update; skip the call when the value hasn't
-        // changed so we don't keep triggering requestLayout() via setPaddingRelative,
-        // setImageResource, and updateLayoutParams.
         if (lastAppliedShowContextualSheetIcon == showContextualSheetIcon) return
         lastAppliedShowContextualSheetIcon = showContextualSheetIcon
-        // (aiChatMenu as? android.widget.ImageView)?.applyDuckAiIconStyling(showContextualSheetIcon)
     }
 
     override fun setNativeInputLaunchListener(listener: NativeInputLaunchListener) {
@@ -1814,7 +1793,6 @@ class OmnibarLayout @JvmOverloads constructor(
     }
 
     private fun animateOmnibarFocusedState(focused: Boolean) {
-        // temporarily disable focus animation
     }
 
     private fun onFindInPageShown() {
@@ -1854,10 +1832,6 @@ class OmnibarLayout @JvmOverloads constructor(
         visibility = View.GONE
     }
 
-    /**
-     * Glide listener for Easter Egg logos that plays a wiggle animation once the image loads.
-     * Only animates once per unique logo URL, and skips animation for favourite logos.
-     */
     private inner class EasterEggLogoListener(
         private val leadingIconState: EasterEggLogo,
         private val logoUrl: String,
@@ -1888,6 +1862,17 @@ class OmnibarLayout @JvmOverloads constructor(
     companion object {
         private const val EASTER_EGG_ANIMATION_DELAY_MS = 1000L
         private const val LOCKED_INPUT_ALPHA = 0.4f
+
+        // Popup menu item IDs
+        private const val MENU_TEACH_MODE = 1
+        private const val MENU_ROTATION_MODE = 2
+        private const val MENU_RESET_COUNTER = 3
+        private const val MENU_RESCAN_PAGE = 4
+        private const val MENU_CLEAR_RULES = 5
+        private const val MENU_FILL_BASE = 100
+
+        // Popup menu group IDs (used to render section dividers in the DDG theme)
+        private const val GROUP_FILL = 1
     }
 }
 
@@ -1921,23 +1906,12 @@ internal fun resolveRebrandPrivacyShieldLayout(
     }
 }
 
-/**
- * Whether the fire icon should occupy the shared fire/+ leading slot in the omnibar.
- *
- * Fire is the default leading action. The + icon only replaces it inside a Duck.ai view when the
- * native chat input is enabled; with nativeChatInput off (the web-input fallback) the user keeps
- * the fire button even in a Duck.ai view. nativeChatInput already implies nativeInputField.
- */
 internal fun shouldShowFireIcon(
     showFireIcon: Boolean,
     isDuckAiMode: Boolean,
     isNativeChatInputEnabled: Boolean,
 ): Boolean = showFireIcon && !(isDuckAiMode && isNativeChatInputEnabled)
 
-/**
- * Whether the + icon should occupy the shared fire/+ leading slot in the omnibar. Only shown inside
- * a Duck.ai view when the native chat input is enabled.
- */
 internal fun shouldShowPlusIcon(
     showFireIcon: Boolean,
     isDuckAiMode: Boolean,

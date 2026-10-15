@@ -1,6 +1,17 @@
 /*
  * Copyright (c) 2025 DuckDuckGo
- * ... license header ...
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.duckduckgo.app.automation
@@ -34,14 +45,20 @@ object VaultRepository {
     fun init(context: Context) {
         if (prefs != null) return
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        groups.value = load()
+        groups.value = sortGroups(load())
     }
 
-    fun addGroup(name: String, rawText: String, pinned: Boolean = false) {
+    fun addGroup(
+        name: String,
+        rawText: String,
+        pinned: Boolean = false,
+    ) {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) return
         val entries = parseEntries(rawText)
         val finalPinned = pinned && groups.value.count { it.pinned } < MAX_PINNED
-        val group = VaultGroup(name = name.trim(), entries = entries, pinned = finalPinned)
-        groups.value = groups.value + group
+        val group = VaultGroup(name = trimmedName, entries = entries, pinned = finalPinned)
+        groups.value = sortGroups(groups.value + group)
         save()
     }
 
@@ -50,7 +67,10 @@ object VaultRepository {
         save()
     }
 
-    fun renameGroup(oldName: String, newName: String) {
+    fun renameGroup(
+        oldName: String,
+        newName: String,
+    ) {
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return
         groups.value = groups.value.map { g ->
@@ -64,13 +84,10 @@ object VaultRepository {
         if (!current.pinned && groups.value.count { it.pinned } >= MAX_PINNED) {
             return // silently ignore — UI will show a toast
         }
-        groups.value = groups.value.map { g ->
+        val updated = groups.value.map { g ->
             if (g.name == name) g.copy(pinned = !g.pinned) else g
         }
-        // Sort: pinned first, original order preserved within each bucket
-        val pinned = groups.value.filter { it.pinned }
-        val unpinned = groups.value.filterNot { it.pinned }
-        groups.value = pinned + unpinned
+        groups.value = sortGroups(updated)
         save()
     }
 
@@ -78,7 +95,11 @@ object VaultRepository {
 
     fun getGroup(name: String): VaultGroup? = groups.value.firstOrNull { it.name == name }
 
-    fun updateEntryValue(groupName: String, index: Int, newValue: String) {
+    fun updateEntryValue(
+        groupName: String,
+        index: Int,
+        newValue: String,
+    ) {
         groups.value = groups.value.map { g ->
             if (g.name != groupName) return@map g
             val updated = g.entries.toMutableList()
@@ -90,7 +111,10 @@ object VaultRepository {
         save()
     }
 
-    fun deleteEntry(groupName: String, index: Int) {
+    fun deleteEntry(
+        groupName: String,
+        index: Int,
+    ) {
         groups.value = groups.value.map { g ->
             if (g.name != groupName) return@map g
             val updated = g.entries.toMutableList()
@@ -98,6 +122,12 @@ object VaultRepository {
             g.copy(entries = updated)
         }
         save()
+    }
+
+    private fun sortGroups(list: List<VaultGroup>): List<VaultGroup> {
+        val pinned = list.filter { it.pinned }
+        val unpinned = list.filterNot { it.pinned }
+        return pinned + unpinned
     }
 
     private fun parseEntries(rawText: String): List<VaultEntry> {

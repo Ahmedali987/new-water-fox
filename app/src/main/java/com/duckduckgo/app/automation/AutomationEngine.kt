@@ -1,6 +1,17 @@
 /*
  * Copyright (c) 2025 DuckDuckGo
- * ... license header ...
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.duckduckgo.app.automation
@@ -18,6 +29,7 @@ import org.json.JSONObject
 import java.lang.ref.WeakReference
 
 object AutomationEngine {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var currentWebView: WeakReference<WebView>? = null
     private var scannerJs: String? = null
     private var appContext: Context? = null
@@ -33,13 +45,23 @@ object AutomationEngine {
         val looksLike: String,
     )
 
+    @Volatile
     private var lastDetectedFields: List<DetectedField> = emptyList()
 
     fun init(context: Context) {
-        appContext = context.applicationContext
+        val appCtx = context.applicationContext
+        appContext = appCtx
+        AutomationEngineContextHolder.context = appCtx
+        VaultRepository.init(appCtx)
     }
 
     fun attachWebView(webView: WebView) {
+        val appCtx = webView.context.applicationContext
+        if (appContext == null) {
+            appContext = appCtx
+            AutomationEngineContextHolder.context = appCtx
+        }
+        VaultRepository.init(appCtx)
         currentWebView = WeakReference(webView)
     }
 
@@ -50,23 +72,24 @@ object AutomationEngine {
     }
 
     fun injectScanner() {
+        val webView = currentWebView?.get()
+        if (webView == null) {
+            Log.d("AUTOMATION", "injectScanner: webView is NULL")
+            return
+        }
+
         // DIAGNOSTIC: probe whether the bridge is registered
-        currentWebView?.get()?.evaluateJavascript("typeof window.AutomationBridge") { result ->
-            Handler(Looper.getMainLooper()).post {
+        webView.evaluateJavascript("typeof window.AutomationBridge") { result ->
+            mainHandler.post {
                 appContext?.let {
                     Toast.makeText(it, "Bridge type: $result", Toast.LENGTH_LONG).show()
                 }
             }
         }
 
-        val webView = currentWebView?.get()
-        if (webView == null) {
-            Log.d("AUTOMATION", "injectScanner: webView is NULL")
-            return
-        }
         val js = scannerJs ?: loadScanner()
         if (js == null) {
-            Log.d("AUTOMATION", "injectScanner: JS asset could not be loaded")
+            Log.e("AUTOMATION", "injectScanner: JS asset could not be loaded (appContext=$appContext)")
             return
         }
         Log.d("AUTOMATION", "injectScanner: evaluating JS (${js.length} chars)")
@@ -82,23 +105,23 @@ object AutomationEngine {
                 .bufferedReader().use { it.readText() }
                 .also { scannerJs = it }
         } catch (e: Exception) {
+            Log.e("AUTOMATION", "loadScanner error: ${e.message}", e)
             null
         }
     }
 
- fun onFieldsDetected(json: String) {
-    Log.d("AUTOMATION", "onFieldsDetected called: $json")
-    Handler(Looper.getMainLooper()).post {
-        appContext?.let {
-            Toast.makeText(it, "Bridge: ${json.take(80)}", Toast.LENGTH_LONG).show()
+    fun onFieldsDetected(json: String) {
+        Log.d("AUTOMATION", "onFieldsDetected called: $json")
+        mainHandler.post {
+            appContext?.let {
+                Toast.makeText(it, "Bridge: ${json.take(80)}", Toast.LENGTH_LONG).show()
+            }
         }
-    }
-    try {
-        // Debug-only payload — don't try to parse as field list
-        if (json.contains("\"debug\"")) return
+        try {
+            // Debug-only payload — don't try to parse as field list
+            if (json.contains("\"debug\"")) return
 
-        val arr = JSONArray(json)
-        // ... rest unchanged
+            val arr = JSONArray(json)
             lastDetectedFields = (0 until arr.length()).map {
                 val obj = arr.getJSONObject(it)
                 DetectedField(
@@ -117,18 +140,45 @@ object AutomationEngine {
         }
     }
 
-    fun fillCurrentPage() {
-        val webView = currentWebView?.get() ?: return
-        val groups = VaultRepository.groups.value
-        val entries = groups.firstOrNull()?.entries ?: return
-        if (entries.isEmpty() || lastDetectedFields.isEmpty()) return
+    private fun normalizeKey(raw: String): String {
+        val cleaned = raw.lowercase().replace(Regex("[\\s_\\-]+"), "")
+        return when (cleaned) {
+            "fname", "givenname" -> "firstname"
+            "lname", "surname", "familyname" -> "lastname"
+            "name" -> "fullname"
+            "user", "login" -> "username"
+            "mail", "emailaddress" -> "email"
+            "mobile", "tel", "telephone", "phonenumber", "contact" -> "phone"
+            "pwd", "pass" -> "password"
+            "street", "addr", "streetaddress" -> "address"
+            "town" -> "city"
+            "postal", "postalcode", "pincode", "zipcode", "pin" -> "zip"
+            "birth", "birthdate", "dateofbirth", "birthday" -> "dob"
+            else -> cleaned
+        }
+    }
 
-        val byType = entries.associate { it.fieldType.lowercase() to it.value }
+    fun fillCurrentPage(groupName: String? = null) {
+        val webView = currentWebView?.get() ?: return
+        appContext?.let { VaultRepository.init(it) }
+
+        val groups = VaultRepository.groups.value
+        val targetGroup = if (groupName != null) {
+            VaultRepository.getGroup(groupName)
+        } else {
+            groups.firstOrNull { it.pinned } ?: groups.firstOrNull()
+        }
+        val entries = targetGroup?.entries ?: return
+        val fields = lastDetectedFields
+        if (entries.isEmpty() || fields.isEmpty()) return
+
+        val byType = entries.associate { normalizeKey(it.fieldType) to it.value }
         val fallback = entries.firstOrNull()?.value ?: ""
 
         val fillList = JSONArray()
-        lastDetectedFields.forEach { field ->
-            val value = byType[field.looksLike]
+        fields.forEach { field ->
+            val key = normalizeKey(field.looksLike)
+            val value = byType[key]
                 ?: byType["text"]
                 ?: fallback
             val obj = JSONObject()
@@ -137,6 +187,11 @@ object AutomationEngine {
             fillList.put(obj)
         }
         val arg = JSONObject.quote(fillList.toString())
-        webView.evaluateJavascript("(async () => { await window.__automationFill($arg); })();", null)
+        mainHandler.post {
+            webView.evaluateJavascript(
+                "(async () => { if (window.__automationFill) await window.__automationFill($arg); })();",
+                null,
+            )
+        }
     }
 }

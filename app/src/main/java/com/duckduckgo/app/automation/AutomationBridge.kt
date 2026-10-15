@@ -16,10 +16,12 @@
 
 package com.duckduckgo.app.automation
 
-import android.webkit.JavascriptInterface
-import android.widget.Toast
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.Keep
+import android.webkit.JavascriptInterface
+import android.widget.Toast
 
 /**
  * JS bridge exposed to every page as `window.AutomationBridge`.
@@ -27,19 +29,23 @@ import android.os.Looper
  * Anything annotated with @JavascriptInterface is callable from JavaScript running inside the
  * WebView. This is how the scanner tells the app "I found N fields on this page".
  */
+
+ @Keep
 class AutomationBridge {
 
     /**
      * Called from automation_scanner.js when it finishes scanning the page.
      * The payload is a JSON array of detected fields — see DetectedField in AutomationEngine.
      */
+    @Keep
     @JavascriptInterface
     fun onFieldsDetected(json: String) {
         // Show a diagnostic toast so we can see in real time whether the JS actually reached us.
         Handler(Looper.getMainLooper()).post {
             try {
+                val ctx = AutomationEngineContextHolder.context ?: return@post
                 Toast.makeText(
-                    AutomationEngineContextHolder.context,
+                    ctx,
                     "Bridge received: ${json.take(80)}",
                     Toast.LENGTH_LONG,
                 ).show()
@@ -53,12 +59,8 @@ class AutomationBridge {
 
 /**
  * Holds the Application context so the bridge (which has no context of its own) can show toasts.
- * AutomationEngine calls this from init(); it is a no-op if init hasn't been called yet.
+ * AutomationEngine sets this from init() and attachWebView().
  */
 internal object AutomationEngineContextHolder {
-    var context: android.content.Context? = null
-
-    init {
-        // Nothing to do at object init; context is set from AutomationEngine.init()
-    }
+    var context: Context? = null
 }

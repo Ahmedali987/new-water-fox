@@ -16,9 +16,6 @@
 
 package com.duckduckgo.app.browser.omnibar
 
-
-import androidx.lifecycle.Observer
-import com.duckduckgo.app.automation.AutomationEngine
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
@@ -55,6 +52,7 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.findViewTreeViewModelStoreOwner
@@ -68,13 +66,13 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withC
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
 import com.duckduckgo.anvil.annotations.InjectWith
+import com.duckduckgo.app.automation.AutomationEngine
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.browser.SmoothProgressAnimator
 import com.duckduckgo.app.browser.api.OmnibarRepository
 import com.duckduckgo.app.browser.databinding.IncludeCustomTabToolbarBinding
 import com.duckduckgo.app.browser.databinding.IncludeFindInPageBinding
 import com.duckduckgo.app.browser.databinding.IncludeNewCustomTabToolbarBinding
-import com.duckduckgo.app.browser.nativeinput.applyDuckAiIconStyling
 import com.duckduckgo.app.browser.omnibar.Omnibar.ItemPressedListener
 import com.duckduckgo.app.browser.omnibar.Omnibar.LogoClickListener
 import com.duckduckgo.app.browser.omnibar.Omnibar.NativeInputLaunchListener
@@ -228,8 +226,10 @@ class OmnibarLayout @JvmOverloads constructor(
     private var previousTransitionState: TransitionState? = null
     private var lastAppliedShowContextualSheetIcon: Boolean? = null
     private val detectedFieldsObserver = Observer<Int> { count ->
-    aiChatMenu?.isVisible = count > 0
-}
+        val showAutomationIcon = count > 0
+        aiChatMenu?.isVisible = showAutomationIcon
+        aiChatDivider.isVisible = (voiceSearchButton.isVisible || clearTextButton.isVisible) && showAutomationIcon
+    }
 
     private val lifecycleOwner: LifecycleOwner by lazy {
         requireNotNull(findViewTreeLifecycleOwner())
@@ -495,26 +495,26 @@ class OmnibarLayout @JvmOverloads constructor(
             stateBuffer.clear()
         }
 
-                animatorHelper.setListener(this)
-    findInPage.findInPageContainer.viewTreeObserver.addOnGlobalLayoutListener(findInPageLayoutVisibilityChangeListener)
-    AutomationEngine.detectedFieldCount.observeForever(detectedFieldsObserver)
+        animatorHelper.setListener(this)
+        findInPage.findInPageContainer.viewTreeObserver.addOnGlobalLayoutListener(findInPageLayoutVisibilityChangeListener)
+        AutomationEngine.detectedFieldCount.observeForever(detectedFieldsObserver)
 
-    // Force our robot icon on the address bar slot
-    (aiChatMenu as? ImageView)?.let { iv ->
-        iv.setImageResource(CommonR.drawable.ic_automation_24)
-        iv.setColorFilter(context.getColorFromAttr(com.duckduckgo.mobile.android.R.attr.daxColorPrimaryIcon))
-        iv.contentDescription = "Automation"
+        // Force our robot icon on the address bar slot
+        (aiChatMenu as? ImageView)?.let { iv ->
+            iv.setImageResource(CommonR.drawable.ic_automation_24)
+            iv.setColorFilter(context.getColorFromAttr(CommonR.attr.daxColorPrimaryIcon))
+            iv.contentDescription = "Automation"
+        }
     }
-}
 
-   override fun onDetachedFromWindow() {
-    conflatedStateJob.cancel()
-    conflatedCommandJob.cancel()
-    focusAnimator?.cancel()
-    findInPage.findInPageContainer.viewTreeObserver.removeOnGlobalLayoutListener(findInPageLayoutVisibilityChangeListener)
-    AutomationEngine.detectedFieldCount.removeObserver(detectedFieldsObserver)
-    super.onDetachedFromWindow()
-}
+    override fun onDetachedFromWindow() {
+        conflatedStateJob.cancel()
+        conflatedCommandJob.cancel()
+        focusAnimator?.cancel()
+        findInPage.findInPageContainer.viewTreeObserver.removeOnGlobalLayoutListener(findInPageLayoutVisibilityChangeListener)
+        AutomationEngine.detectedFieldCount.removeObserver(detectedFieldsObserver)
+        super.onDetachedFromWindow()
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun setOmnibarTextListener(textListener: TextListener) {
@@ -628,9 +628,9 @@ class OmnibarLayout @JvmOverloads constructor(
         browserMenu.setOnClickListener {
             omnibarItemPressedListener?.onBrowserMenuPressed()
         }
-       aiChatMenu?.setOnClickListener {
-    AutomationEngine.fillCurrentPage()
-}
+        aiChatMenu?.setOnClickListener {
+            AutomationEngine.fillCurrentPage()
+        }
         shieldIcon.setOnClickListener {
             if (isAttachedToWindow) {
                 viewModel.onPrivacyShieldButtonPressed()
@@ -913,6 +913,7 @@ class OmnibarLayout @JvmOverloads constructor(
     }
 
     fun renderButtons(viewState: ViewState) {
+        val showAutomationIcon = (AutomationEngine.detectedFieldCount.value ?: 0) > 0
         val newTransitionState =
             TransitionState(
                 showClearButton = viewState.showClearButton,
@@ -921,7 +922,7 @@ class OmnibarLayout @JvmOverloads constructor(
                 showFireIcon = viewState.showFireIcon && !viewState.showFindInPage,
                 showBrowserMenu = viewState.showBrowserMenu && !viewState.showFindInPage,
                 showBrowserMenuHighlight = viewState.showBrowserMenuHighlight,
-                showChatMenu = viewState.showChatMenu,
+                showChatMenu = showAutomationIcon,
                 showSpacer = viewState.showClearButton || viewState.showVoiceSearch,
                 showDuckSidebar = viewState.showDuckAISidebar,
                 showDuckBack = viewState.showDuckAISidebar,
@@ -962,10 +963,12 @@ class OmnibarLayout @JvmOverloads constructor(
             isDuckAiMode = newTransitionState.isDuckAiMode,
             isNativeChatInputEnabled = newTransitionState.isNativeChatInputEnabled,
         )
-       // Icon visibility is driven by AutomationEngine.detectedFieldCount observer
-browserMenuHighlight.isVisible = newTransitionState.showBrowserMenuHighlight
-applyAiChatMenuStyling(viewState.showContextualSheetIcon)
-        aiChatDivider.isVisible = (viewState.showVoiceSearch || viewState.showClearButton) && viewState.showChatMenu
+        // Icon visibility is driven by AutomationEngine.detectedFieldCount observer
+        aiChatMenu?.isVisible = showAutomationIcon
+        browserMenu.isVisible = newTransitionState.showBrowserMenu
+        browserMenuHighlight.isVisible = newTransitionState.showBrowserMenuHighlight
+        applyAiChatMenuStyling(viewState.showContextualSheetIcon)
+        aiChatDivider.isVisible = (viewState.showVoiceSearch || viewState.showClearButton) && showAutomationIcon
         duckAISidebar.isVisible = newTransitionState.showDuckSidebar
         duckAIBack.isVisible = newTransitionState.showDuckBack
 
@@ -1732,7 +1735,10 @@ applyAiChatMenuStyling(viewState.showContextualSheetIcon)
         }
     }
 
-    private fun applyEnabled(view: View, enabled: Boolean) {
+    private fun applyEnabled(
+        view: View,
+        enabled: Boolean,
+    ) {
         view.isEnabled = enabled
         view.alpha = if (enabled) 1.0f else LOCKED_INPUT_ALPHA
     }

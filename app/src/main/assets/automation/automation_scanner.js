@@ -1,12 +1,17 @@
 (function() {
-    if (window.__automationScannerInstalled) return;
-    window.__automationScannerInstalled = true;
-
     function debug(msg) {
         try {
             window.AutomationBridge.onFieldsDetected(JSON.stringify([{ debug: msg }]));
         } catch (e) {}
     }
+
+    if (window.__automationScannerInstalled) {
+        if (typeof window.__automationScan === 'function') {
+            window.__automationScan();
+        }
+        return;
+    }
+    window.__automationScannerInstalled = true;
 
     debug("scanner loaded");
 
@@ -16,7 +21,8 @@
         var id = el.id;
         if (id) {
             try {
-                var label = document.querySelector('label[for="' + id + '"]');
+                var escapedId = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(id) : id.replace(/"/g, '\\"');
+                var label = document.querySelector('label[for="' + escapedId + '"]');
                 if (label) return label.textContent.trim();
             } catch (e) {}
         }
@@ -49,6 +55,19 @@
         return 'unknown';
     }
 
+    function setNativeValue(el, value) {
+        var proto = Object.getPrototypeOf(el);
+        var descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
+        if (descriptor && descriptor.set) {
+            descriptor.set.call(el, value);
+        } else {
+            el.value = value;
+        }
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+
     function scan() {
         try {
             var fields = document.querySelectorAll('input, select, textarea');
@@ -57,7 +76,7 @@
             var detected = [];
             for (var i = 0; i < fields.length; i++) {
                 var el = fields[i];
-                if (el.type === 'hidden') continue;
+                if (el.type === 'hidden' || el.disabled || el.readOnly) continue;
                 var rect = el.getBoundingClientRect();
                 if (rect.width === 0 && rect.height === 0) continue;
                 detected.push({
@@ -74,6 +93,25 @@
             debug("scan error: " + e.message);
         }
     }
+
+    window.__automationScan = scan;
+
+    window.__automationFill = async function(payload) {
+        try {
+            var items = typeof payload === 'string' ? JSON.parse(payload) : payload;
+            var fields = document.querySelectorAll('input, select, textarea');
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var el = fields[item.index];
+                if (!el) continue;
+                el.focus();
+                setNativeValue(el, item.value);
+            }
+            debug("filled " + items.length + " fields");
+        } catch (e) {
+            debug("fill error: " + e.message);
+        }
+    };
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setTimeout(scan, 800);

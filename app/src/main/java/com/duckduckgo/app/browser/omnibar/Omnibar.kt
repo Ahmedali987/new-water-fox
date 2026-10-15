@@ -138,6 +138,7 @@ class Omnibar(
         val text: String,
         val hasFocus: Boolean,
     )
+
     sealed class ViewMode {
         data object Error : ViewMode()
 

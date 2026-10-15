@@ -49,7 +49,7 @@ import com.duckduckgo.mobile.android.R.drawable
 fun AddDataChoiceScreen(
     onBack: () -> Unit,
     onPasteClick: () -> Unit,
-    onUploadClick: () -> Unit,
+    onUploadClick: () -> Unit,  // ← change this line only
     onGenerateClick: () -> Unit,
 ) {
     Column(
@@ -57,7 +57,6 @@ fun AddDataChoiceScreen(
             .fillMaxSize()
             .background(DuckDuckGoTheme.colors.backgrounds.background),
     ) {
-        // Standard DDG Top App Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -93,7 +92,6 @@ fun AddDataChoiceScreen(
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
-            // DDG-style single container with dividers
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

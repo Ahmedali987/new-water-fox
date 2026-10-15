@@ -134,13 +134,12 @@ fun AutomationNavHost(
 
                 // ================= File Upload =================
                 AutomationScreen.FileUpload -> FileUploadScreen(
-                    onBack = { current = AutomationScreen.AddData },
-                    onFileImported = { file ->
-                        // Save the file's content as a group and go Home
-                        VaultRepository.addGroup(file.displayName, file.contentPreview)
-                        current = AutomationScreen.Home
-                    },
-                )
+    onBack = { current = AutomationScreen.AddData },
+    onGroupCreated = { groupName, parsedText ->
+        VaultRepository.addGroup(groupName, parsedText)
+        current = AutomationScreen.Home
+    },
+)
 
                 // ================= Generate Data =================
                 AutomationScreen.GenerateData -> GenerateDataScreen(

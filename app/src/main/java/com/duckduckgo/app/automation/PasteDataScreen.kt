@@ -1,17 +1,6 @@
 /*
  * Copyright (c) 2025 DuckDuckGo
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * ... license header ...
  */
 
 package com.duckduckgo.app.automation
@@ -68,11 +57,14 @@ fun PasteDataScreen(
         .map { it.trim() }
         .count { it.isNotEmpty() }
 
+    // Field colors — explicitly forcing primary text color everywhere
     val fieldColors = TextFieldDefaults.colors(
         focusedTextColor = DuckDuckGoTheme.colors.text.primary,
         unfocusedTextColor = DuckDuckGoTheme.colors.text.primary,
+        disabledTextColor = DuckDuckGoTheme.colors.text.primary,
         focusedLabelColor = DuckDuckGoTheme.colors.text.secondary,
         unfocusedLabelColor = DuckDuckGoTheme.colors.text.secondary,
+        disabledLabelColor = DuckDuckGoTheme.colors.text.secondary,
         focusedPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
         unfocusedPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
         cursorColor = DuckDuckGoTheme.colors.brand.accentBlue,
@@ -89,7 +81,6 @@ fun PasteDataScreen(
             .fillMaxSize()
             .background(DuckDuckGoTheme.colors.backgrounds.background),
     ) {
-        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,7 +111,6 @@ fun PasteDataScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
-            // Field name
             Text(
                 text = stringResource(R.string.automation_field_name_label),
                 color = DuckDuckGoTheme.colors.text.secondary,
@@ -136,6 +126,10 @@ fun PasteDataScreen(
                         color = DuckDuckGoTheme.colors.text.secondary,
                     )
                 },
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = DuckDuckGoTheme.colors.text.primary,
+                    fontSize = 15.sp,
+                ),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = shape,
@@ -148,7 +142,6 @@ fun PasteDataScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Values
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -178,6 +171,10 @@ fun PasteDataScreen(
                         color = DuckDuckGoTheme.colors.text.secondary,
                     )
                 },
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = DuckDuckGoTheme.colors.text.primary,
+                    fontSize = 14.sp,
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp),
@@ -191,7 +188,6 @@ fun PasteDataScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Save button
             val canSave = fieldName.isNotBlank() && valueCount > 0
             Button(
                 onClick = {

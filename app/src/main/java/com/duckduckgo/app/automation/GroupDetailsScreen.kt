@@ -6,6 +6,8 @@
 package com.duckduckgo.app.automation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,10 +23,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -39,13 +48,36 @@ fun GroupDetailScreen(
     groupName: String,
     onBack: () -> Unit,
 ) {
-    val group = VaultRepository.getGroup(groupName)
+    // Trigger recomposition when the vault changes
+    val groups = VaultRepository.groups.value
+    val group = groups.firstOrNull { it.name == groupName }
+
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var editValue by remember { mutableStateOf("") }
+    var addFieldName by remember { mutableStateOf("") }
+    var addFieldValue by remember { mutableStateOf("") }
+    var showAddRow by remember { mutableStateOf(false) }
+
+    val fieldColors = TextFieldDefaults.colors(
+        focusedTextColor = DuckDuckGoTheme.colors.text.primary,
+        unfocusedTextColor = DuckDuckGoTheme.colors.text.primary,
+        focusedLabelColor = DuckDuckGoTheme.colors.text.secondary,
+        unfocusedLabelColor = DuckDuckGoTheme.colors.text.secondary,
+        focusedPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
+        unfocusedPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
+        cursorColor = DuckDuckGoTheme.colors.brand.accentBlue,
+        focusedContainerColor = DuckDuckGoTheme.colors.backgrounds.surface,
+        unfocusedContainerColor = DuckDuckGoTheme.colors.backgrounds.surface,
+        focusedIndicatorColor = DuckDuckGoTheme.colors.brand.accentBlue,
+        unfocusedIndicatorColor = DuckDuckGoTheme.colors.text.secondary,
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(DuckDuckGoTheme.colors.backgrounds.background),
     ) {
+        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -74,38 +106,119 @@ fun GroupDetailScreen(
                     fontSize = 13.sp,
                 )
             }
+            IconButton(onClick = { showAddRow = !showAddRow }) {
+                Icon(
+                    painter = painterResource(drawable.ic_add_24),
+                    contentDescription = "Add field",
+                    tint = DuckDuckGoTheme.colors.icons.primary,
+                )
+            }
         }
 
         val entries = group?.entries ?: emptyList()
-        if (entries.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.automation_no_entries),
-                    color = DuckDuckGoTheme.colors.text.secondary,
-                    fontSize = 15.sp,
-                )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        ) {
+            // Add-new-field form
+            if (showAddRow) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = DuckDuckGoTheme.colors.backgrounds.surface,
+                            shape = RoundedCornerShape(12.dp),
+                        )
+                        .padding(12.dp),
+                ) {
+                    Text(
+                        text = "New field",
+                        color = DuckDuckGoTheme.colors.text.secondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = addFieldName,
+                        onValueChange = { addFieldName = it },
+                        label = { Text("Field name (e.g. email)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = addFieldValue,
+                        onValueChange = { addFieldValue = it },
+                        label = { Text("Value") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Cancel",
+                            color = DuckDuckGoTheme.colors.text.secondary,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .clickable { showAddRow = false; addFieldName = ""; addFieldValue = "" }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Add",
+                            color = DuckDuckGoTheme.colors.brand.accentBlue,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .clickable {
+                                    if (addFieldName.isNotBlank() && addFieldValue.isNotBlank()) {
+                                        VaultRepository.addEntryToGroup(groupName, addFieldName, addFieldValue)
+                                        addFieldName = ""
+                                        addFieldValue = ""
+                                        showAddRow = false
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            ) {
-                entries.forEach { entry ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = DuckDuckGoTheme.colors.backgrounds.surface,
-                                shape = RoundedCornerShape(12.dp),
-                            )
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+
+            if (entries.isEmpty() && !showAddRow) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No entries yet. Tap + to add one.",
+                        color = DuckDuckGoTheme.colors.text.secondary,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+
+            entries.forEachIndexed { index, entry ->
+                val isEditing = editingIndex == index
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = DuckDuckGoTheme.colors.backgrounds.surface,
+                            shape = RoundedCornerShape(12.dp),
+                        )
+                        .padding(16.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = entry.fieldType.replaceFirstChar { it.uppercase() },
@@ -113,16 +226,76 @@ fun GroupDetailScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                             )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = entry.value,
-                                color = DuckDuckGoTheme.colors.text.primary,
-                                fontSize = 15.sp,
-                            )
+                        }
+                        if (!isEditing) {
+                            IconButton(onClick = {
+                                editingIndex = index
+                                editValue = entry.value
+                            }) {
+                                Icon(
+                                    painter = painterResource(drawable.ic_edit_24),
+                                    contentDescription = "Edit",
+                                    tint = DuckDuckGoTheme.colors.icons.primary,
+                                    modifier = Modifier.width(20.dp),
+                                )
+                            }
+                            IconButton(onClick = {
+                                VaultRepository.deleteEntry(groupName, index)
+                            }) {
+                                Icon(
+                                    painter = painterResource(drawable.ic_fire_24),
+                                    contentDescription = "Delete",
+                                    tint = DuckDuckGoTheme.colors.text.destructive,
+                                    modifier = Modifier.width(20.dp),
+                                )
+                            }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+
+                    if (isEditing) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = editValue,
+                            onValueChange = { editValue = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = fieldColors,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Cancel",
+                                color = DuckDuckGoTheme.colors.text.secondary,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clickable { editingIndex = null }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Save",
+                                color = DuckDuckGoTheme.colors.brand.accentBlue,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier
+                                    .clickable {
+                                        VaultRepository.updateEntryValue(groupName, index, editValue)
+                                        editingIndex = null
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                            )
+                        }
+                    } else {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = entry.value,
+                            color = DuckDuckGoTheme.colors.text.primary,
+                            fontSize = 15.sp,
+                        )
+                    }
                 }
+                Spacer(Modifier.height(8.dp))
             }
         }
     }

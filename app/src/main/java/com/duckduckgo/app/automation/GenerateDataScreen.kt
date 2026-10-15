@@ -6,6 +6,8 @@
 package com.duckduckgo.app.automation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -45,7 +50,7 @@ import com.duckduckgo.common.ui.compose.theme.DuckDuckGoTheme
 import com.duckduckgo.mobile.android.R.drawable
 
 object MockFormGenerator {
-    val fields: List<Pair<String, String>> = listOf(
+    val defaultFields: List<Pair<String, String>> = listOf(
         "email" to "user${(1000..9999).random()}@example.com",
         "confirmEmail" to "user${(1000..9999).random()}@example.com",
         "password" to "SecurePass${(100..999).random()}!",
@@ -59,9 +64,6 @@ object MockFormGenerator {
         "gender" to "Male",
         "dob" to "15/05/1990",
     )
-
-    fun generateAsText(): String =
-        fields.joinToString("\n") { (k, v) -> "$k: $v" }
 }
 
 @Composable
@@ -70,7 +72,13 @@ fun GenerateDataScreen(
     onSaved: () -> Unit,
 ) {
     var groupName by remember { mutableStateOf("") }
-    val preview = remember { MockFormGenerator.fields }
+
+    // Mutable state list so we can edit/add/remove
+    val fields = remember {
+        mutableStateListOf<Pair<String, String>>().apply {
+            addAll(MockFormGenerator.defaultFields)
+        }
+    }
 
     val fieldColors = TextFieldDefaults.colors(
         focusedTextColor = DuckDuckGoTheme.colors.text.primary,
@@ -93,7 +101,6 @@ fun GenerateDataScreen(
             .fillMaxSize()
             .background(DuckDuckGoTheme.colors.backgrounds.background),
     ) {
-        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -142,6 +149,7 @@ fun GenerateDataScreen(
                         color = DuckDuckGoTheme.colors.text.secondary,
                     )
                 },
+                textStyle = TextStyle(color = DuckDuckGoTheme.colors.text.primary, fontSize = 15.sp),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = shape,
@@ -163,46 +171,95 @@ fun GenerateDataScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = DuckDuckGoTheme.colors.backgrounds.surface,
-                        shape = shape,
-                    )
-                    .padding(12.dp),
-            ) {
-                preview.forEach { (key, value) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                    ) {
-                        Text(
-                            text = key,
-                            color = DuckDuckGoTheme.colors.text.secondary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(0.4f),
+            // Each editable field row
+            fields.forEachIndexed { index, (key, value) ->
+                var currentKey by remember { mutableStateOf(key) }
+                var currentValue by remember { mutableStateOf(value) }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = DuckDuckGoTheme.colors.backgrounds.surface,
+                            shape = shape,
                         )
-                        Text(
-                            text = value,
-                            color = DuckDuckGoTheme.colors.text.primary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.weight(0.6f),
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = currentKey,
+                            onValueChange = {
+                                currentKey = it
+                                fields[index] = it to currentValue
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = fieldColors,
+                            textStyle = TextStyle(color = DuckDuckGoTheme.colors.text.secondary, fontSize = 12.sp),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = currentValue,
+                            onValueChange = {
+                                currentValue = it
+                                fields[index] = currentKey to it
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = fieldColors,
+                            textStyle = TextStyle(color = DuckDuckGoTheme.colors.text.primary, fontSize = 14.sp),
+                        )
+                    }
+                    IconButton(onClick = { fields.removeAt(index) }) {
+                        Icon(
+                            painter = painterResource(drawable.ic_fire_24),
+                            contentDescription = "Remove",
+                            tint = DuckDuckGoTheme.colors.text.destructive,
                         )
                     }
                 }
+                Spacer(Modifier.height(6.dp))
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(4.dp))
+
+            // Add new field button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        fields.add("newField" to "")
+                    }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    painter = painterResource(drawable.ic_add_24),
+                    contentDescription = null,
+                    tint = DuckDuckGoTheme.colors.brand.accentBlue,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Add field",
+                    color = DuckDuckGoTheme.colors.brand.accentBlue,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             Button(
                 onClick = {
                     val name = groupName.ifBlank {
                         "Form ${System.currentTimeMillis() % 10000}"
                     }
-                    VaultRepository.addGroup(name, MockFormGenerator.generateAsText())
+                    val text = fields.joinToString("\n") { (k, v) -> "$k: $v" }
+                    VaultRepository.addGroup(name, text)
                     onSaved()
                 },
                 modifier = Modifier.fillMaxWidth(),

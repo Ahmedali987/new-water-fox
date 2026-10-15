@@ -145,6 +145,14 @@ object VaultRepository {
             }
     }
 
+    fun addEntryToGroup(groupName: String, fieldType: String, value: String) {
+    groups.value = groups.value.map { g ->
+        if (g.name != groupName) return@map g
+        g.copy(entries = g.entries + VaultEntry(fieldType.trim(), value.trim()))
+    }
+    save()
+}
+
     private fun save() {
         val json = JSONArray()
         groups.value.forEach { group ->

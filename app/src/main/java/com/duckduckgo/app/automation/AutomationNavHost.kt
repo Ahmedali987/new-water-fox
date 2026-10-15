@@ -36,6 +36,7 @@ sealed interface AutomationScreen {
     object AddData : AutomationScreen
     object PasteData : AutomationScreen
     object GenerateData : AutomationScreen
+    object ViewLogs : AutomationScreen
     data class GroupDetail(val groupName: String) : AutomationScreen
     object CreateAutomation : AutomationScreen
     data class Running(val groupName: String, val mode: String) : AutomationScreen
@@ -76,6 +77,7 @@ fun AutomationNavHost(onBack: () -> Unit) {
                     AutomationScreen.AddData -> current = AutomationScreen.Home
                     AutomationScreen.PasteData -> current = AutomationScreen.AddData
                     AutomationScreen.GenerateData -> current = AutomationScreen.AddData
+                    AutomationScreen.ViewLogs -> current = AutomationScreen.Home
                     AutomationScreen.CreateAutomation -> current = AutomationScreen.Home
                     is AutomationScreen.Running -> current = AutomationScreen.Home
                     is AutomationScreen.Completed -> current = AutomationScreen.Home
@@ -88,7 +90,7 @@ fun AutomationNavHost(onBack: () -> Unit) {
                     onMyDataClick = { current = AutomationScreen.MyData },
                     onAddDataClick = { current = AutomationScreen.AddData },
                     onCreateAutomationClick = { current = AutomationScreen.CreateAutomation },
-                    onViewLogsClick = { /* Phase 5 */ },
+                    onViewLogsClick = { current = AutomationScreen.ViewLogs },
                 )
 
                 AutomationScreen.MyData -> MyDataScreen(
@@ -121,6 +123,10 @@ fun AutomationNavHost(onBack: () -> Unit) {
                     onSaved = { current = AutomationScreen.Home },
                 )
 
+                AutomationScreen.ViewLogs -> ViewLogsScreen(
+                    onBack = { current = AutomationScreen.Home },
+                )
+
                 is AutomationScreen.GroupDetail -> GroupDetailScreen(
                     groupName = c.groupName,
                     onBack = { current = AutomationScreen.MyData },
@@ -146,7 +152,7 @@ fun AutomationNavHost(onBack: () -> Unit) {
                     groupName = c.groupName,
                     mode = c.mode,
                     totalFilled = c.count,
-                    onViewLogs = { /* Phase 5 */ },
+                    onViewLogs = { current = AutomationScreen.ViewLogs },
                     onRunAgain = { current = AutomationScreen.CreateAutomation },
                     onBack = { current = AutomationScreen.Home },
                 )

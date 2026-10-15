@@ -17,6 +17,7 @@
 package com.duckduckgo.app.automation
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -48,11 +49,26 @@ object AutomationEngine {
     @Volatile
     private var lastDetectedFields: List<DetectedField> = emptyList()
 
+    // ---------- Toast helper ----------
+
+    private fun showToast(message: String) {
+        mainHandler.post {
+            try {
+                appContext?.let {
+                    Toast.makeText(it, message, Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    // ---------- Lifecycle ----------
+
     fun init(context: Context) {
         val appCtx = context.applicationContext
         appContext = appCtx
         AutomationEngineContextHolder.context = appCtx
         VaultRepository.init(appCtx)
+        AutomationLog.init(appCtx)
     }
 
     fun attachWebView(webView: WebView) {
@@ -62,6 +78,7 @@ object AutomationEngine {
             AutomationEngineContextHolder.context = appCtx
         }
         VaultRepository.init(appCtx)
+        AutomationLog.init(appCtx)
         currentWebView = WeakReference(webView)
     }
 
@@ -71,31 +88,12 @@ object AutomationEngine {
         lastDetectedFields = emptyList()
     }
 
+    // ---------- Scanner injection ----------
+
     fun injectScanner() {
-        val webView = currentWebView?.get()
-        if (webView == null) {
-            Log.d("AUTOMATION", "injectScanner: webView is NULL")
-            return
-        }
-
-        // DIAGNOSTIC: probe whether the bridge is registered
-        webView.evaluateJavascript("typeof window.AutomationBridge") { result ->
-            mainHandler.post {
-                appContext?.let {
-                    Toast.makeText(it, "Bridge type: $result", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-
-        val js = scannerJs ?: loadScanner()
-        if (js == null) {
-            Log.e("AUTOMATION", "injectScanner: JS asset could not be loaded (appContext=$appContext)")
-            return
-        }
-        Log.d("AUTOMATION", "injectScanner: evaluating JS (${js.length} chars)")
-        webView.evaluateJavascript(js) { result ->
-            Log.d("AUTOMATION", "injectScanner result: $result")
-        }
+        val webView = currentWebView?.get() ?: return
+        val js = scannerJs ?: loadScanner() ?: return
+        webView.evaluateJavascript(js, null)
     }
 
     private fun loadScanner(): String? {
@@ -110,15 +108,11 @@ object AutomationEngine {
         }
     }
 
+    // ---------- Field detection callback ----------
+
     fun onFieldsDetected(json: String) {
-        Log.d("AUTOMATION", "onFieldsDetected called: $json")
-        mainHandler.post {
-            appContext?.let {
-                Toast.makeText(it, "Bridge: ${json.take(80)}", Toast.LENGTH_LONG).show()
-            }
-        }
         try {
-            // Debug-only payload — don't try to parse as field list
+            // Debug-only payloads from JS — ignore silently
             if (json.contains("\"debug\"")) return
 
             val arr = JSONArray(json)
@@ -132,7 +126,6 @@ object AutomationEngine {
                     looksLike = obj.optString("looksLike"),
                 )
             }
-            Log.d("AUTOMATION", "Parsed ${lastDetectedFields.size} fields")
             _detectedFieldCount.postValue(lastDetectedFields.size)
         } catch (e: Exception) {
             Log.d("AUTOMATION", "onFieldsDetected parse error: ${e.message}")
@@ -140,11 +133,24 @@ object AutomationEngine {
         }
     }
 
+    // ---------- Fill completion callback ----------
+
+    fun onFillComplete(count: Int) {
+        if (count > 0) {
+            showToast("Filled $count fields")
+        } else {
+            showToast("No matching fields to fill")
+        }
+    }
+
+    // ---------- Field key normalization ----------
+
     private fun normalizeKey(raw: String): String {
         val cleaned = raw.lowercase().replace(Regex("[\\s_\\-]+"), "")
         return when (cleaned) {
             "fname", "givenname" -> "firstname"
             "lname", "surname", "familyname" -> "lastname"
+            "middlename", "mname" -> "middlename"
             "name" -> "fullname"
             "user", "login" -> "username"
             "mail", "emailaddress" -> "email"
@@ -154,38 +160,141 @@ object AutomationEngine {
             "town" -> "city"
             "postal", "postalcode", "pincode", "zipcode", "pin" -> "zip"
             "birth", "birthdate", "dateofbirth", "birthday" -> "dob"
+            "confirmpassword", "retypepassword", "repeatpassword" -> "confirmpassword"
+            "confirmemail" -> "confirmemail"
+            "confirmphone" -> "confirmphone"
+            "dobday" -> "dobday"
+            "dobmonth" -> "dobmonth"
+            "dobyear" -> "dobyear"
+            "selectunknown" -> "selectunknown"
             else -> cleaned
         }
     }
 
-    fun fillCurrentPage(groupName: String? = null) {
-        val webView = currentWebView?.get() ?: return
-        appContext?.let { VaultRepository.init(it) }
+    private fun splitDob(dob: String): Triple<String, String, String>? {
+        val parts = dob.trim().split(Regex("[/\\-.]"))
+        if (parts.size != 3) return null
+        return try {
+            if (parts[0].length == 4) {
+                Triple(parts[2], parts[1], parts[0])
+            } else {
+                Triple(parts[0], parts[1], parts[2])
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
 
+    private fun resolveValue(
+        fieldKey: String,
+        byType: Map<String, String>,
+        dobParts: Triple<String, String, String>?,
+    ): String? {
+        return when (fieldKey) {
+            "skip" -> null
+            "confirmpassword" -> byType["password"]
+            "confirmemail" -> byType["email"]
+            "confirmphone" -> byType["phone"]
+            "dobday" -> dobParts?.first
+            "dobmonth" -> dobParts?.second
+            "dobyear" -> dobParts?.third
+            else -> byType[fieldKey]
+        }
+    }
+
+    // ---------- Main fill entry point ----------
+
+    fun fillCurrentPage(groupName: String? = null) {
+        val webView = currentWebView?.get() ?: run {
+            showToast("No page loaded")
+            return
+        }
+        appContext?.let {
+            VaultRepository.init(it)
+            AutomationLog.init(it)
+        }
+
+        // 1. Vault empty?
         val groups = VaultRepository.groups.value
+        if (groups.isEmpty()) {
+            showToast("No data found. Add some in My Data.")
+            return
+        }
+
+        // 2. Group has entries?
         val targetGroup = if (groupName != null) {
             VaultRepository.getGroup(groupName)
         } else {
             groups.firstOrNull { it.pinned } ?: groups.firstOrNull()
         }
-        val entries = targetGroup?.entries ?: return
-        val fields = lastDetectedFields
-        if (entries.isEmpty() || fields.isEmpty()) return
+        if (targetGroup == null) {
+            showToast("No data found for this group")
+            return
+        }
+        val entries = targetGroup.entries
+        if (entries.isEmpty()) {
+            showToast("No data found in '${targetGroup.name}'")
+            return
+        }
 
+        // 3. Any fields detected on the page?
+        val fields = lastDetectedFields
+        if (fields.isEmpty()) {
+            showToast("No form fields detected on this page")
+            return
+        }
+
+        // 4. Build the fill payload
         val byType = entries.associate { normalizeKey(it.fieldType) to it.value }
-        val fallback = entries.firstOrNull()?.value ?: ""
+        val dobRaw = byType["dob"]
+        val dobParts = if (dobRaw != null) splitDob(dobRaw) else null
+
+        val usedEntries = mutableSetOf<VaultEntry>()
 
         val fillList = JSONArray()
         fields.forEach { field ->
             val key = normalizeKey(field.looksLike)
-            val value = byType[key]
-                ?: byType["text"]
-                ?: fallback
+            val value = resolveValue(key, byType, dobParts) ?: return@forEach
+
+            entries.firstOrNull { normalizeKey(it.fieldType) == key }?.let {
+                usedEntries.add(it)
+            }
+            when (key) {
+                "confirmpassword" -> entries.firstOrNull { normalizeKey(it.fieldType) == "password" }?.let { usedEntries.add(it) }
+                "confirmemail" -> entries.firstOrNull { normalizeKey(it.fieldType) == "email" }?.let { usedEntries.add(it) }
+                "confirmphone" -> entries.firstOrNull { normalizeKey(it.fieldType) == "phone" }?.let { usedEntries.add(it) }
+            }
+
             val obj = JSONObject()
             obj.put("index", field.index)
             obj.put("value", value)
             fillList.put(obj)
         }
+
+        if (fillList.length() == 0) {
+            showToast("No matching fields to fill")
+            return
+        }
+
+        // 5. Log the fill event
+        val currentUrl = webView.url ?: "unknown"
+        val host = try {
+            Uri.parse(currentUrl).host ?: currentUrl
+        } catch (_: Exception) {
+            currentUrl
+        }
+        try {
+            AutomationLog.add(
+                website = host,
+                groupName = targetGroup.name,
+                fieldsFilled = fillList.length(),
+                entriesUsed = usedEntries.toList(),
+            )
+        } catch (e: Exception) {
+            Log.e("AUTOMATION", "Failed to write log: ${e.message}")
+        }
+
+        // 6. Send to JS
         val arg = JSONObject.quote(fillList.toString())
         mainHandler.post {
             webView.evaluateJavascript(

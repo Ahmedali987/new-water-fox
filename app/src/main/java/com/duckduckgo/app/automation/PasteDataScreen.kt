@@ -1,11 +1,24 @@
 /*
  * Copyright (c) 2025 DuckDuckGo
- * ... license header ...
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.duckduckgo.app.automation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,11 +27,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,9 +43,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -52,19 +64,22 @@ fun PasteDataScreen(
     var fieldName by remember { mutableStateOf("") }
     var valuesText by remember { mutableStateOf("") }
 
+    var fieldNameError by remember { mutableStateOf(false) }
+    var valuesError by remember { mutableStateOf(false) }
+
     val valueCount = valuesText
         .lines()
         .map { it.trim() }
         .count { it.isNotEmpty() }
 
-    // Field colors — explicitly forcing primary text color everywhere
+    val shape = RoundedCornerShape(10.dp)
+
     val fieldColors = TextFieldDefaults.colors(
         focusedTextColor = DuckDuckGoTheme.colors.text.primary,
         unfocusedTextColor = DuckDuckGoTheme.colors.text.primary,
-        disabledTextColor = DuckDuckGoTheme.colors.text.primary,
+        disabledTextColor = DuckDuckGoTheme.colors.text.disabled,
         focusedLabelColor = DuckDuckGoTheme.colors.text.secondary,
         unfocusedLabelColor = DuckDuckGoTheme.colors.text.secondary,
-        disabledLabelColor = DuckDuckGoTheme.colors.text.secondary,
         focusedPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
         unfocusedPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
         cursorColor = DuckDuckGoTheme.colors.brand.accentBlue,
@@ -72,21 +87,26 @@ fun PasteDataScreen(
         unfocusedContainerColor = DuckDuckGoTheme.colors.backgrounds.surface,
         focusedIndicatorColor = DuckDuckGoTheme.colors.brand.accentBlue,
         unfocusedIndicatorColor = DuckDuckGoTheme.colors.text.secondary,
+        errorTextColor = DuckDuckGoTheme.colors.text.primary,
+        errorLabelColor = DuckDuckGoTheme.colors.text.destructive,
+        errorIndicatorColor = DuckDuckGoTheme.colors.text.destructive,
+        errorCursorColor = DuckDuckGoTheme.colors.text.destructive,
+        errorContainerColor = DuckDuckGoTheme.colors.backgrounds.surface,
+        errorPlaceholderColor = DuckDuckGoTheme.colors.text.secondary,
     )
-
-    val shape = RoundedCornerShape(12.dp)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(DuckDuckGoTheme.colors.backgrounds.background),
     ) {
+        // ---------- Top bar ----------
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DuckDuckGoTheme.colors.backgrounds.surface)
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -99,7 +119,7 @@ fun PasteDataScreen(
             Text(
                 text = stringResource(R.string.automation_paste_title),
                 color = DuckDuckGoTheme.colors.text.primary,
-                fontSize = 20.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -109,27 +129,42 @@ fun PasteDataScreen(
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
+            // ---------- Field name ----------
             Text(
-                text = stringResource(R.string.automation_field_name_label),
-                color = DuckDuckGoTheme.colors.text.secondary,
+                text = "Field name",
+                color = DuckDuckGoTheme.colors.text.primary,
                 fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = fieldName,
-                onValueChange = { fieldName = it },
+                onValueChange = {
+                    fieldName = it
+                    if (fieldNameError && it.isNotBlank()) fieldNameError = false
+                },
                 placeholder = {
                     Text(
-                        text = stringResource(R.string.automation_field_name_placeholder),
+                        text = "e.g. Phone Number",
                         color = DuckDuckGoTheme.colors.text.secondary,
                     )
                 },
-                textStyle = androidx.compose.ui.text.TextStyle(
+                textStyle = TextStyle(
                     color = DuckDuckGoTheme.colors.text.primary,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                 ),
+                isError = fieldNameError,
+                supportingText = if (fieldNameError) {
+                    {
+                        Text(
+                            text = "Field name is required",
+                            color = DuckDuckGoTheme.colors.text.destructive,
+                            fontSize = 11.sp,
+                        )
+                    }
+                } else null,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = shape,
@@ -140,23 +175,25 @@ fun PasteDataScreen(
                 ),
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(10.dp))
 
+            // ---------- Values ----------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = stringResource(R.string.automation_values_label),
-                    color = DuckDuckGoTheme.colors.text.secondary,
+                    text = "Values (one per line)",
+                    color = DuckDuckGoTheme.colors.text.primary,
                     fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 if (valueCount > 0) {
                     Text(
                         text = stringResource(R.string.automation_values_count, valueCount),
                         color = DuckDuckGoTheme.colors.brand.accentBlue,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
                 }
@@ -164,20 +201,33 @@ fun PasteDataScreen(
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = valuesText,
-                onValueChange = { valuesText = it },
+                onValueChange = {
+                    valuesText = it
+                    if (valuesError && it.isNotBlank()) valuesError = false
+                },
                 placeholder = {
                     Text(
-                        text = stringResource(R.string.automation_values_placeholder),
+                        text = "+91 9876543210\n+91 9876543211\n+91 9876543212",
                         color = DuckDuckGoTheme.colors.text.secondary,
                     )
                 },
-                textStyle = androidx.compose.ui.text.TextStyle(
+                textStyle = TextStyle(
                     color = DuckDuckGoTheme.colors.text.primary,
                     fontSize = 14.sp,
                 ),
+                isError = valuesError,
+                supportingText = if (valuesError) {
+                    {
+                        Text(
+                            text = "Paste at least one value",
+                            color = DuckDuckGoTheme.colors.text.destructive,
+                            fontSize = 11.sp,
+                        )
+                    }
+                } else null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp),
+                    .height(220.dp),
                 shape = shape,
                 colors = fieldColors,
                 keyboardOptions = KeyboardOptions(
@@ -186,25 +236,32 @@ fun PasteDataScreen(
                 ),
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
+            // ---------- Save button ----------
             val canSave = fieldName.isNotBlank() && valueCount > 0
-            Button(
-                onClick = {
-                    if (canSave) {
-                        VaultRepository.addGroup(fieldName, valuesText)
-                        onSaved()
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = if (canSave) DuckDuckGoTheme.colors.brand.accentBlue
+                        else DuckDuckGoTheme.colors.text.disabled,
+                        shape = shape,
+                    )
+                    .clickable {
+                        if (canSave) {
+                            VaultRepository.addGroup(fieldName, valuesText)
+                            onSaved()
+                        } else {
+                            // Show validation errors
+                            fieldNameError = fieldName.isBlank()
+                            valuesError = valueCount == 0
+                        }
                     }
-                },
-                enabled = canSave,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DuckDuckGoTheme.colors.brand.accentBlue,
-                    contentColor = Color.White,
-                    disabledContainerColor = DuckDuckGoTheme.colors.text.disabled,
-                    disabledContentColor = Color.White,
-                ),
-                shape = shape,
+                    .padding(vertical = 14.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = if (valueCount > 0) {
@@ -212,10 +269,9 @@ fun PasteDataScreen(
                     } else {
                         stringResource(R.string.automation_save)
                     },
-                    color = Color.White,
-                    fontSize = 15.sp,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
 

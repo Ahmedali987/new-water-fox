@@ -35,16 +35,27 @@ sealed interface AutomationScreen {
     object MyData : AutomationScreen
     object AddData : AutomationScreen
     object PasteData : AutomationScreen
+    object FileUpload : AutomationScreen
     object GenerateData : AutomationScreen
     object ViewLogs : AutomationScreen
     data class GroupDetail(val groupName: String) : AutomationScreen
+
+    // Saved automations
+    object AutomationList : AutomationScreen
+    object NewAutomation : AutomationScreen
+    data class EditAutomation(val id: Long) : AutomationScreen
+
+    // Legacy single-shot flow
     object CreateAutomation : AutomationScreen
     data class Running(val groupName: String, val mode: String) : AutomationScreen
     data class Completed(val groupName: String, val mode: String, val count: Int) : AutomationScreen
 }
 
 @Composable
-fun AutomationNavHost(onBack: () -> Unit) {
+fun AutomationNavHost(
+    onBack: () -> Unit,
+    onOpenUrl: (String) -> Unit = {},
+) {
     // DDG's theme intentionally sets Material3 typography/colors to debug values
     // (cursive magenta). Override them back to sane defaults.
     MaterialTheme(
@@ -76,8 +87,14 @@ fun AutomationNavHost(onBack: () -> Unit) {
                     is AutomationScreen.GroupDetail -> current = AutomationScreen.MyData
                     AutomationScreen.AddData -> current = AutomationScreen.Home
                     AutomationScreen.PasteData -> current = AutomationScreen.AddData
+                    AutomationScreen.FileUpload -> current = AutomationScreen.AddData
                     AutomationScreen.GenerateData -> current = AutomationScreen.AddData
                     AutomationScreen.ViewLogs -> current = AutomationScreen.Home
+
+                    AutomationScreen.AutomationList -> current = AutomationScreen.Home
+                    AutomationScreen.NewAutomation -> current = AutomationScreen.AutomationList
+                    is AutomationScreen.EditAutomation -> current = AutomationScreen.AutomationList
+
                     AutomationScreen.CreateAutomation -> current = AutomationScreen.Home
                     is AutomationScreen.Running -> current = AutomationScreen.Home
                     is AutomationScreen.Completed -> current = AutomationScreen.Home
@@ -85,53 +102,99 @@ fun AutomationNavHost(onBack: () -> Unit) {
             }
 
             when (val c = current) {
+                // ================= Home =================
                 AutomationScreen.Home -> AutomationHomeScreen(
                     onBack = onBack,
                     onMyDataClick = { current = AutomationScreen.MyData },
                     onAddDataClick = { current = AutomationScreen.AddData },
-                    onCreateAutomationClick = { current = AutomationScreen.CreateAutomation },
+                    onCreateAutomationClick = { current = AutomationScreen.AutomationList },
                     onViewLogsClick = { current = AutomationScreen.ViewLogs },
                 )
 
+                // ================= My Data =================
                 AutomationScreen.MyData -> MyDataScreen(
                     onBack = { current = AutomationScreen.Home },
                     onAddClick = { current = AutomationScreen.AddData },
                     onGroupClick = { name -> current = AutomationScreen.GroupDetail(name) },
                 )
 
+                // ================= Add Data Choice =================
                 AutomationScreen.AddData -> AddDataChoiceScreen(
                     onBack = { current = AutomationScreen.Home },
                     onPasteClick = { current = AutomationScreen.PasteData },
-                    onFileLoaded = { filename, text ->
-                        // Parse the file with SmartParser to extract structured data
-                        val parsed = SmartParser.parse(text)
-                        val lines = parsed.all.joinToString("\n") { (k, v) -> "$k: $v" }
-                        // If parser found nothing, fall back to raw text
-                        VaultRepository.addGroup(filename, lines.ifBlank { text })
-                        current = AutomationScreen.Home
-                    },
+                    onUploadClick = { current = AutomationScreen.FileUpload },
                     onGenerateClick = { current = AutomationScreen.GenerateData },
                 )
 
+                // ================= Paste Data =================
                 AutomationScreen.PasteData -> PasteDataScreen(
                     onBack = { current = AutomationScreen.AddData },
                     onSaved = { current = AutomationScreen.Home },
                 )
 
+                // ================= File Upload =================
+                AutomationScreen.FileUpload -> FileUploadScreen(
+                    onBack = { current = AutomationScreen.AddData },
+                    onFileImported = { file ->
+                        // Save the file's content as a group and go Home
+                        VaultRepository.addGroup(file.displayName, file.contentPreview)
+                        current = AutomationScreen.Home
+                    },
+                )
+
+                // ================= Generate Data =================
                 AutomationScreen.GenerateData -> GenerateDataScreen(
                     onBack = { current = AutomationScreen.AddData },
                     onSaved = { current = AutomationScreen.Home },
                 )
 
+                // ================= Logs =================
                 AutomationScreen.ViewLogs -> ViewLogsScreen(
                     onBack = { current = AutomationScreen.Home },
                 )
 
+                // ================= Group Detail =================
                 is AutomationScreen.GroupDetail -> GroupDetailScreen(
                     groupName = c.groupName,
                     onBack = { current = AutomationScreen.MyData },
                 )
 
+                // ================= Saved Automations =================
+                AutomationScreen.AutomationList -> AutomationListScreen(
+                    onBack = { current = AutomationScreen.Home },
+                    onStart = { automation ->
+                        // Arm the runner and tell the browser to open the URL
+                        AutomationRunner.start(automation)
+                        onOpenUrl(automation.url)
+                        onBack()
+                    },
+                    onEdit = { automation ->
+                        current = AutomationScreen.EditAutomation(automation.id)
+                    },
+                    onNew = { current = AutomationScreen.NewAutomation },
+                )
+
+                AutomationScreen.NewAutomation -> NewAutomationScreen(
+                    editing = null,
+                    onBack = { current = AutomationScreen.AutomationList },
+                    onSaved = { current = AutomationScreen.AutomationList },
+                )
+
+                is AutomationScreen.EditAutomation -> {
+                    val editing = SavedAutomationRepository.get(c.id)
+                    if (editing != null) {
+                        NewAutomationScreen(
+                            editing = editing,
+                            onBack = { current = AutomationScreen.AutomationList },
+                            onSaved = { current = AutomationScreen.AutomationList },
+                        )
+                    } else {
+                        // Automation disappeared (deleted elsewhere) — go back to list
+                        current = AutomationScreen.AutomationList
+                    }
+                }
+
+                // ================= Legacy single-shot flow =================
                 AutomationScreen.CreateAutomation -> CreateAutomationScreen(
                     onBack = { current = AutomationScreen.Home },
                     onStart = { groupName, mode ->

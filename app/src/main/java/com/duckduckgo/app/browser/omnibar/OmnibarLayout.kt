@@ -628,9 +628,63 @@ class OmnibarLayout @JvmOverloads constructor(
         browserMenu.setOnClickListener {
             omnibarItemPressedListener?.onBrowserMenuPressed()
         }
-        aiChatMenu?.setOnClickListener {
+                aiChatMenu?.setOnClickListener {
             AutomationEngine.fillCurrentPage()
         }
+              
+        aiChatMenu?.setOnLongClickListener { anchor ->
+            val popup = android.widget.PopupMenu(context, anchor)
+            val domain = AutomationEngine.currentDomain().ifBlank { "this site" }
+            val teachLabel = if (AutomationEngine.isTeachModeActive) {
+                "Stop Teach Mode"
+            } else {
+                "🎯 Teach Mode (Tap Elements to Learn)"
+            }
+            val modeName = if (
+                com.duckduckgo.app.automation.SiteProfileRepository.rotationMode ==
+                com.duckduckgo.app.automation.RotationMode.SEQUENTIAL
+            ) {
+                "🔄 Mode: 1-by-1 from Top (Tap for Random)"
+            } else {
+                "🎲 Mode: Random (Tap for 1-by-1)"
+            }
+
+            popup.menu.add(0, 1, 0, teachLabel)
+            popup.menu.add(0, 2, 1, modeName)
+            popup.menu.add(0, 3, 2, "⏮️ Reset Data Counter to #1 for $domain")
+            popup.menu.add(0, 4, 3, "🔍 Re-scan Page")
+            popup.menu.add(0, 5, 4, "🗑️ Clear Learned Rules for $domain")
+
+            val groups = com.duckduckgo.app.automation.VaultRepository.groups.value
+            groups.forEachIndexed { index, group ->
+                val pinPrefix = if (group.pinned) "★ " else ""
+                val usedCount = com.duckduckgo.app.automation.SiteProfileRepository.getUsedCountForSite(domain, group.name)
+                popup.menu.add(1, 100 + index, 10 + index, "Fill: $pinPrefix${group.name} (Used: $usedCount)")
+            }
+
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> AutomationEngine.toggleTeachMode()
+                    2 -> AutomationEngine.toggleRotationMode()
+                    3 -> AutomationEngine.resetCurrentSiteRotation()
+                    4 -> AutomationEngine.injectScanner()
+                    5 -> AutomationEngine.clearCurrentSiteProfile()
+                    else -> {
+                        val groupIdx = item.itemId - 100
+                        val chosen = groups.getOrNull(groupIdx)
+                        if (chosen != null) {
+                            AutomationEngine.fillCurrentPage(chosen.name)
+                        }
+                    }
+                }
+                true
+            }
+            popup.show()
+            true
+        }
+
+
+        
         shieldIcon.setOnClickListener {
             if (isAttachedToWindow) {
                 viewModel.onPrivacyShieldButtonPressed()

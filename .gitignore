@@ -116,3 +116,4 @@ PixelDefinitions/node_modules/
 /.claude/worktrees/*
 CLAUDE.local.md
 docs/**.swp
+*.swp

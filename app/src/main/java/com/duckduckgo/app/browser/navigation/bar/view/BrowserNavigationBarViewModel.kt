@@ -32,8 +32,10 @@ import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarView.V
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyAutofillButtonClicked
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyBookmarksButtonClicked
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyFireButtonClicked
+import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyHomeButtonClicked
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyMenuButtonClicked
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyNewTabButtonClicked
+import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifySearchButtonClicked
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyTabsButtonClicked
 import com.duckduckgo.app.browser.navigation.bar.view.BrowserNavigationBarViewModel.Command.NotifyTabsButtonLongClicked
 import com.duckduckgo.app.pixels.AppPixelName
@@ -139,13 +141,24 @@ class BrowserNavigationBarViewModel @Inject constructor(
         _commands.trySend(NotifyBookmarksButtonClicked)
     }
 
+    fun onHomeButtonClicked() {
+        _commands.trySend(NotifyHomeButtonClicked)
+    }
+
+    fun onSearchButtonClicked() {
+        _commands.trySend(NotifySearchButtonClicked)
+    }
+
     fun setViewMode(viewMode: ViewMode) {
         when (viewMode) {
             NewTab -> {
                 _viewState.update {
                     it.copy(
                         newTabButtonVisible = false,
-                        autofillButtonVisible = true,
+                        autofillButtonVisible = false,
+                        fireButtonVisible = false,
+                        homeButtonVisible = true,
+                        searchButtonVisible = true,
                         viewMode = viewMode,
                     )
                 }
@@ -154,8 +167,11 @@ class BrowserNavigationBarViewModel @Inject constructor(
             Browser -> {
                 _viewState.update {
                     it.copy(
-                        newTabButtonVisible = true,
+                        newTabButtonVisible = false,
                         autofillButtonVisible = false,
+                        fireButtonVisible = false,
+                        homeButtonVisible = true,
+                        searchButtonVisible = true,
                         viewMode = viewMode,
                     )
                 }
@@ -164,8 +180,11 @@ class BrowserNavigationBarViewModel @Inject constructor(
             DuckAI -> {
                 _viewState.update {
                     it.copy(
-                        newTabButtonVisible = true,
+                        newTabButtonVisible = false,
                         autofillButtonVisible = false,
+                        fireButtonVisible = false,
+                        homeButtonVisible = true,
+                        searchButtonVisible = true,
                         viewMode = viewMode,
                     )
                 }
@@ -174,8 +193,11 @@ class BrowserNavigationBarViewModel @Inject constructor(
             TabManager -> {
                 _viewState.update {
                     it.copy(
-                        newTabButtonVisible = true,
+                        newTabButtonVisible = false,
                         autofillButtonVisible = false,
+                        fireButtonVisible = false,
+                        homeButtonVisible = false,
+                        searchButtonVisible = false,
                         tabsButtonVisible = false,
                         bookmarksButtonVisible = false,
                         showShadow = false,
@@ -183,6 +205,7 @@ class BrowserNavigationBarViewModel @Inject constructor(
                     )
                 }
             }
+
             CustomTab -> {
                 _viewState.update {
                     it.copy(
@@ -224,6 +247,8 @@ class BrowserNavigationBarViewModel @Inject constructor(
         data object NotifyNewTabButtonClicked : Command()
         data object NotifyAutofillButtonClicked : Command()
         data object NotifyBookmarksButtonClicked : Command()
+        data object NotifyHomeButtonClicked : Command()
+        data object NotifySearchButtonClicked : Command()
     }
 
     /**
@@ -236,10 +261,10 @@ class BrowserNavigationBarViewModel @Inject constructor(
 
     data class ViewState(
         val isVisible: Boolean = true,
-        val newTabButtonVisible: Boolean = true,
+        val newTabButtonVisible: Boolean = false,
         val autofillButtonVisible: Boolean = false,
         val bookmarksButtonVisible: Boolean = true,
-        val fireButtonVisible: Boolean = true,
+        val fireButtonVisible: Boolean = false,
         val fireButtonHighlighted: Boolean = false,
         val tabsButtonVisible: Boolean = true,
         val tabsCount: Int = 0,
@@ -248,5 +273,7 @@ class BrowserNavigationBarViewModel @Inject constructor(
         val viewMode: ViewMode = Browser,
         val showShadow: Boolean = true,
         val enabledState: EnabledState = EnabledState.ALL,
+        val homeButtonVisible: Boolean = true,
+        val searchButtonVisible: Boolean = true,
     )
 }

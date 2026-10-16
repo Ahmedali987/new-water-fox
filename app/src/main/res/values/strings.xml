@@ -1116,4 +1116,6 @@
 <string name="automation_group_name_label">Group name (e.g. Signups)</string>
 <string name="automation_save">Save</string>
 
+<string name="browserMenuHome">Home</string>
+
 </resources>

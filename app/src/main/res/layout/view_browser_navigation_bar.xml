@@ -33,46 +33,57 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:parentTag="androidx.coordinatorlayout.widget.CoordinatorLayout">
 
+        <!-- Hidden legacy button — kept so old bindings keep working -->
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+            android:id="@+id/newTabButton"
+            android:layout_width="@dimen/toolbarIcon"
+            android:layout_height="@dimen/toolbarIcon"
+            android:background="@drawable/selectable_item_rounded_corner_background"
+            android:visibility="gone">
 
-            <FrameLayout
-                android:id="@+id/newTabButton"
-                android:layout_width="@dimen/toolbarIcon"
-                android:layout_height="@dimen/toolbarIcon"
-                android:background="@drawable/selectable_item_rounded_corner_background"
-                android:visibility="gone"
-                tools:visibility="visible">
+            <ImageView
+                android:id="@+id/newTabButtonImageView"
+                android:layout_width="@dimen/bottomNavIcon"
+                android:layout_height="@dimen/bottomNavIcon"
+                android:layout_gravity="center"
+                android:contentDescription="@string/newTabMenuItem"
+                android:scaleType="center"
+                android:src="@drawable/ic_add_24" />
+        </FrameLayout>
 
-                <ImageView
-                    android:id="@+id/newTabButtonImageView"
-                    android:layout_width="@dimen/bottomNavIcon"
-                    android:layout_height="@dimen/bottomNavIcon"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/newTabMenuItem"
-                    android:scaleType="center"
-                    android:src="@drawable/ic_add_24" />
-            </FrameLayout>
+        <!-- Hidden legacy button — kept so old bindings keep working -->
+        <FrameLayout
+            android:id="@+id/autofillButton"
+            android:layout_width="@dimen/toolbarIcon"
+            android:layout_height="@dimen/toolbarIcon"
+            android:background="@drawable/selectable_item_rounded_corner_background"
+            android:visibility="gone">
 
-            <FrameLayout
-                android:id="@+id/autofillButton"
-                android:layout_width="@dimen/toolbarIcon"
-                android:layout_height="@dimen/toolbarIcon"
-                android:background="@drawable/selectable_item_rounded_corner_background"
-                android:visibility="gone"
-                tools:visibility="visible">
+            <ImageView
+                android:id="@+id/autofillButtonImageView"
+                android:layout_width="@dimen/bottomNavIcon"
+                android:layout_height="@dimen/bottomNavIcon"
+                android:layout_gravity="center"
+                android:contentDescription="@string/autofillManagementScreenTitle"
+                android:scaleType="center"
+                android:src="@drawable/ic_key_24" />
+        </FrameLayout>
 
-                <ImageView
-                    android:id="@+id/autofillButtonImageView"
-                    android:layout_width="@dimen/bottomNavIcon"
-                    android:layout_height="@dimen/bottomNavIcon"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/autofillManagementScreenTitle"
-                    android:scaleType="center"
-                    android:src="@drawable/ic_key_24" />
-            </FrameLayout>
+        <!-- Home -->
+        <FrameLayout
+            android:id="@+id/homeButton"
+            android:layout_width="@dimen/toolbarIcon"
+            android:layout_height="@dimen/toolbarIcon"
+            android:background="@drawable/selectable_item_rounded_corner_background">
 
+            <ImageView
+                android:id="@+id/homeImageView"
+                android:layout_width="@dimen/bottomNavIcon"
+                android:layout_height="@dimen/bottomNavIcon"
+                android:layout_gravity="center"
+                android:contentDescription="@string/browserMenuHome"
+                android:scaleType="center"
+                android:src="@drawable/ic_home_24" />
         </FrameLayout>
 
         <Space
@@ -80,6 +91,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1" />
 
+        <!-- Bookmarks -->
         <FrameLayout
             android:id="@+id/bookmarksButton"
             android:layout_width="@dimen/toolbarIcon"
@@ -101,11 +113,35 @@
             android:layout_height="match_parent"
             android:layout_weight="1" />
 
+        <!-- Search -->
+        <FrameLayout
+            android:id="@+id/searchButton"
+            android:layout_width="@dimen/toolbarIcon"
+            android:layout_height="@dimen/toolbarIcon"
+            android:background="@drawable/selectable_item_rounded_corner_background">
+
+            <ImageView
+                android:id="@+id/searchImageView"
+                android:layout_width="@dimen/bottomNavIcon"
+                android:layout_height="@dimen/bottomNavIcon"
+                android:layout_gravity="center"
+                android:contentDescription="@string/search"
+                android:scaleType="center"
+                android:src="@drawable/ic_find_search_small_24" />
+        </FrameLayout>
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <!-- Hidden legacy button — kept so old bindings keep working -->
         <FrameLayout
             android:id="@+id/fireButton"
             android:layout_width="@dimen/toolbarIcon"
             android:layout_height="@dimen/toolbarIcon"
-            android:background="@drawable/selectable_item_rounded_corner_background">
+            android:background="@drawable/selectable_item_rounded_corner_background"
+            android:visibility="gone">
 
             <ImageView
                 android:id="@+id/fireIconImageView"
@@ -117,11 +153,7 @@
                 android:src="@drawable/ic_fire_24" />
         </FrameLayout>
 
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" />
-
+        <!-- Tabs -->
         <com.duckduckgo.browser.ui.tabs.NewTabSwitcherButton
             android:id="@+id/tabsButton"
             android:layout_width="@dimen/toolbarIcon"
@@ -132,6 +164,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1" />
 
+        <!-- Menu -->
         <FrameLayout
             android:id="@+id/menuButton"
             android:layout_width="@dimen/toolbarIcon"

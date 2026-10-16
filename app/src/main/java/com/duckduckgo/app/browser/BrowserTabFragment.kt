@@ -1534,45 +1534,47 @@ class BrowserTabFragment :
     }
 
     private fun configureNavigationBar() {
-        val observer =
-            object : BrowserNavigationBarObserver {
-                override fun onFireButtonClicked() {
-                    onFireButtonPressed()
-                }
-
-                override fun onTabsButtonClicked() {
-                    onTabsButtonPressed()
-                }
-
-                override fun onTabsButtonLongClicked() {
-                    onTabsButtonLongPressed()
-                }
-
-                override fun onMenuButtonClicked() {
-                    onBrowserMenuButtonPressed()
-                }
-
-                override fun onNewTabButtonClicked() {
-                    viewModel.onNavigationBarNewTabButtonClicked()
-                }
-
-                override fun onAutofillButtonClicked() {
-                    viewModel.onNavigationBarAutofillButtonClicked()
-                }
-
-                override fun onBookmarksButtonClicked() {
-                    viewModel.onNavigationBarBookmarksButtonClicked()
-                }
+    val observer =
+        object : BrowserNavigationBarObserver {
+            override fun onFireButtonClicked() {
+                onFireButtonPressed()
             }
 
-        browserNavigationBarIntegration = BrowserNavigationBarViewIntegration(
-            lifecycleScope = lifecycleScope,
-            browserTabFragmentBinding = binding,
-            isEnabled = omnibarRepository.omnibarType == OmnibarType.SPLIT,
-            omnibar = omnibar,
-            browserNavigationBarObserver = observer,
-        )
-    }
+            override fun onTabsButtonClicked() {
+                onTabsButtonPressed()
+            }
+
+            override fun onTabsButtonLongClicked() {
+                onTabsButtonLongPressed()
+            }
+
+            override fun onMenuButtonClicked() {
+                onBrowserMenuButtonPressed()
+            }
+
+            override fun onNewTabButtonClicked() {
+                viewModel.onNavigationBarNewTabButtonClicked()
+            }
+
+            override fun onAutofillButtonClicked() {
+                viewModel.onNavigationBarAutofillButtonClicked()
+            }
+
+            override fun onBookmarksButtonClicked() {
+                viewModel.onNavigationBarBookmarksButtonClicked()
+            }
+
+            override fun onHomeButtonClicked() {
+                // Load DDG homepage in the current tab
+                omnibar.setText("https://duckduckgo.com")
+                viewModel.onUserSubmittedQuery("https://duckduckgo.com")
+            }
+
+            override fun onSearchButtonClicked() {
+                // Focus the address bar so the keyboard opens
+                omnibar.omnibarTextInput.requestFocus()
+            }
+        }
 
     private fun configureEditModeChangeDetection() {
         if (swipingTabsFeature.isEnabled) {

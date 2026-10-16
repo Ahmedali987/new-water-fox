@@ -47,14 +47,21 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!--
+              Action row (Back/Forward/New Tab/Duck.ai/Settings).
+              Kept in the layout so the existing bindings keep working, but
+              hidden by default in Kotlin so the menu starts with list items.
+            -->
             <LinearLayout
                 android:id="@+id/menuActionItemsContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:visibility="gone"
                 android:paddingHorizontal="@dimen/keyline_4"
                 android:paddingTop="@dimen/keyline_2"
-                android:paddingBottom="@dimen/keyline_2">
+                android:paddingBottom="@dimen/keyline_2"
+                tools:visibility="visible">
 
                 <com.duckduckgo.common.ui.view.MenuActionButtonView
                     android:id="@+id/backMenuItem"
@@ -121,6 +128,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/keyline_2"
+                android:visibility="gone"
                 app:defaultPadding="false"
                 app:fullWidth="false" />
 
@@ -137,17 +145,18 @@
                 android:layout_marginBottom="@dimen/keyline_2"
                 android:visibility="gone"
                 app:defaultPadding="false"
-                app:fullWidth="false"
-                tools:visibility="visible" />
+                app:fullWidth="false" />
 
             <include
                 android:id="@+id/includeDefaultBrowserMenuItem"
                 layout="@layout/view_menu_item_default_browser_medium" />
 
+            <!-- Hidden legacy items kept for binding compatibility -->
             <com.duckduckgo.common.ui.view.MenuItemView
                 android:id="@+id/downloadPdfMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_document_download_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuDownloadPdf" />
@@ -156,6 +165,7 @@
                 android:id="@+id/refreshMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_reload_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuRefresh" />
@@ -164,7 +174,8 @@
                 android:id="@+id/addBookmarksMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:iconDrawable="@drawable/ic_bookmark_24"
+                android:visibility="gone"
+                app:iconDrawable="@drawable.ic_bookmark_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuAddBookmark" />
 
@@ -172,6 +183,7 @@
                 android:id="@+id/sharePageMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_share_android_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuShare" />
@@ -180,6 +192,7 @@
                 android:id="@+id/addToHomeMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_add_to_home_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuAddToHome" />
@@ -188,6 +201,7 @@
                 android:id="@+id/findInPageMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_find_in_page_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuFindInPage" />
@@ -196,6 +210,7 @@
                 android:id="@+id/changeBrowsingModeMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_device_desktop_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuDesktopSite" />
@@ -205,7 +220,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:visibility="gone"
-                tools:visibility="visible"
                 app:iconDrawable="@drawable/ic_open_in_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuOpenAppLink" />
@@ -217,8 +231,9 @@
                 android:visibility="gone"
                 app:iconDrawable="@drawable/ic_open_in_24"
                 app:primaryText="@string/browserMenuOpenInDDG"
-                app:menuSize="medium"
-                tools:visibility="visible" />
+                app:menuSize="medium" />
+
+            <!-- ============ Top group ============ -->
 
             <com.duckduckgo.common.ui.view.divider.HorizontalDivider
                 android:id="@+id/librarySectionDivider"
@@ -232,7 +247,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/browserMenuBookmarks"
-                app:iconDrawable="@drawable/ic_bookmarks_24"
+                app:iconDrawable="@drawable.ic_bookmarks_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuBookmarks" />
 
@@ -253,12 +268,14 @@
                 app:primaryText="@string/browserMenuDownloads" />
 
             <com.duckduckgo.common.ui.view.MenuItemView
-                android:id="@+id/automationMenuItem"
+                android:id="@+id/translateMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:iconDrawable="@drawable/ic_automation_24"
+                app:iconDrawable="@drawable/ic_globe_24"
                 app:menuSize="medium"
-                app:primaryText="@string/browserMenuAutomation" />    
+                app:primaryText="@string/browserMenuTranslate" />
+
+            <!-- ============ Middle group ============ -->
 
             <com.duckduckgo.common.ui.view.divider.HorizontalDivider
                 android:id="@+id/privacyToolsSectionDivider"
@@ -267,35 +284,23 @@
                 app:defaultPadding="true"
                 app:fullWidth="false" />
 
-            <include
-                android:id="@+id/includeVpnMenuItem"
-                layout="@layout/view_menu_item_vpn"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-
             <com.duckduckgo.common.ui.view.MenuItemView
-                android:id="@+id/createAliasMenuItem"
+                android:id="@+id/automationMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:iconDrawable="@drawable/ic_email_protection_24"
+                app:iconDrawable="@drawable/ic_automation_24"
                 app:menuSize="medium"
-                app:primaryText="@string/browserMenuEmailAlias" />
+                app:primaryText="@string/browserMenuAutomation" />
 
             <com.duckduckgo.common.ui.view.MenuItemView
-                android:id="@+id/fireproofWebsiteMenuItem"
+                android:id="@+id/toolsMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:iconDrawable="@drawable/ic_fireproof_solid_24"
+                app:iconDrawable="@drawable.ic_settings_24"
                 app:menuSize="medium"
-                app:primaryText="@string/browserMenuFireproofSite" />
+                app:primaryText="@string/browserMenuTools" />
 
-            <com.duckduckgo.common.ui.view.MenuItemView
-                android:id="@+id/fireMenuItem"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:iconDrawable="@drawable/ic_fire_24"
-                app:menuSize="medium"
-                app:primaryText="@string/browserMenuFireTabsData" />
+            <!-- ============ Bottom group ============ -->
 
             <com.duckduckgo.common.ui.view.divider.HorizontalDivider
                 android:id="@+id/utilitiesSectionDivider"
@@ -305,9 +310,54 @@
                 app:fullWidth="false" />
 
             <com.duckduckgo.common.ui.view.MenuItemView
+                android:id="@+id/settingsFullMenuItem"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:iconDrawable="@drawable/ic_settings_24"
+                app:menuSize="medium"
+                app:primaryText="@string/browserMenuSettings" />
+
+            <!-- ============ Hidden legacy items kept for binding ============ -->
+
+            <include
+                android:id="@+id/includeVpnMenuItem"
+                layout="@layout/view_menu_item_vpn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <com.duckduckgo.common.ui.view.MenuItemView
+                android:id="@+id/createAliasMenuItem"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:iconDrawable="@drawable/ic_email_protection_24"
+                app:menuSize="medium"
+                app:primaryText="@string/browserMenuEmailAlias" />
+
+            <com.duckduckgo.common.ui.view.MenuItemView
+                android:id="@+id/fireproofWebsiteMenuItem"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:iconDrawable="@drawable/ic_fireproof_solid_24"
+                app:menuSize="medium"
+                app:primaryText="@string/browserMenuFireproofSite" />
+
+            <com.duckduckgo.common.ui.view.MenuItemView
+                android:id="@+id/fireMenuItem"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:iconDrawable="@drawable/ic_fire_24"
+                app:menuSize="medium"
+                app:primaryText="@string/browserMenuFireTabsData" />
+
+            <com.duckduckgo.common.ui.view.MenuItemView
                 android:id="@+id/reportBrokenSiteMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_support_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuReportBrokenSite" />
@@ -316,6 +366,7 @@
                 android:id="@+id/privacyProtectionMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_shield_disabled_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuEnablePrivacyProtection" />
@@ -324,6 +375,7 @@
                 android:id="@+id/printPageMenuItem"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:visibility="gone"
                 app:iconDrawable="@drawable/ic_print_24"
                 app:menuSize="medium"
                 app:primaryText="@string/browserMenuPrintSite" />
@@ -346,8 +398,7 @@
                 app:typography="body2"
                 app:iconDrawable="@drawable/ic_dax_icon"
                 app:primaryText="@string/browserMenuRunningInDDG"
-                app:menuSize="medium"
-                tools:visibility="visible" />
+                app:menuSize="medium" />
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>

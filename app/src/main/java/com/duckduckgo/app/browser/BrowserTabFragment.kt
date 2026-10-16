@@ -1639,7 +1639,7 @@ override fun onSearchButtonClicked() {
         val params = PrivacyDashboardPrimaryScreen(tabId)
         val intent = globalActivityStarter.startIntent(requireContext(), params)
         contentScopeScripts.sendSubscriptionEvent(createBreakageReportingEventData())
-        intent?.let { activityResultPrivacyDashboard.launch(intent) }
+        intent?.let { activityResultPrivacyDashboard.launch(it) }
         pixel.fire(CustomTabPixelNames.CUSTOM_TABS_PRIVACY_DASHBOARD_OPENED)
     }
 
@@ -1907,28 +1907,9 @@ override fun onSearchButtonClicked() {
                 }
                 viewModel.openNewDuckChat(omnibar.viewMode)
             }
-            onMenuItemClicked(duckAiNewChatMenuItem) {
-                pixel.fire(AppPixelName.SHEET_MENU_AICHAT)
-                viewModel.openNewDuckChat(omnibar.viewMode)
-            }
-            onMenuItemClicked(duckAiNewVoiceChatMenuItem) {
-                pixel.fire(DuckChatPixelName.DUCK_CHAT_VOICE_ENTRY_TAPPED_COUNT)
-                pixel.fire(DuckChatPixelName.DUCK_CHAT_VOICE_ENTRY_TAPPED_DAILY, type = Daily())
-                duckChat.openVoiceDuckChat(DuckChatEntryPoint.VOICE)
-            }
-            onMenuItemClicked(duckChatHistoryMenuItem) {
-                pixel.fire(DuckChatPixelName.DUCK_CHAT_SETTINGS_SIDEBAR_TAPPED)
-                viewModel.openDuckChatHistory(DuckChatHistorySource.BROWSER_MENU)
-            }
-            onMenuItemClicked(duckChatSettingsMenuItem) {
-                viewModel.openDuckChatSettings(omnibar.viewMode)
-            }
             onMenuItemClicked(fireMenuItem) {
                 onFireButtonPressed()
             }
-        }
-        if (!tabDisplayedInCustomTabScreen) {
-            bottomSheetMenu?.placeDuckAiSection(atTop = omnibar.viewMode == DuckAI)
         }
     }
 

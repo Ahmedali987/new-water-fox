@@ -1561,8 +1561,16 @@ class BrowserTabFragment :
             }
 
             override fun onBookmarksButtonClicked() {
-                viewModel.onNavigationBarBookmarksButtonClicked()
-            }
+    viewModel.onNavigationBarBookmarksButtonClicked()
+}
+
+override fun onHomeButtonClicked() {
+    viewModel.onUserSubmittedQuery("https://duckduckgo.com")
+}
+
+override fun onSearchButtonClicked() {
+    omnibar.omnibarTextInput.requestFocus()
+}
 
             override fun onHomeButtonClicked() {
                 // Load DDG homepage in the current tab

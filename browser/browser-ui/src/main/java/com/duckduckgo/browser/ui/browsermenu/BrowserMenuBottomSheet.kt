@@ -185,21 +185,6 @@ class BrowserMenuBottomSheet(
     val toolsMenuItem: MenuItemView
         get() = binding.toolsMenuItem
 
-    
-// Legacy DuckAi getters — kept so existing callers still compile.
-// The AI section is no longer rendered, so these return null.
-val duckAiNewChatMenuItem: View?
-    get() = null
-
-val duckAiNewVoiceChatMenuItem: View?
-    get() = null
-
-val duckChatHistoryMenuItem: View?
-    get() = null
-
-val duckChatSettingsMenuItem: View?
-    get() = null
-
     val translateMenuItem: MenuItemView
         get() = binding.translateMenuItem
 
@@ -245,14 +230,6 @@ val duckChatSettingsMenuItem: View?
             is BrowserMenuViewState.CustomTabs -> renderCustomTabsMenu(viewState)
             is BrowserMenuViewState.DuckAi -> renderBrowserMenu(null)
         }
-    }
-
-    /**
-     * Kept for backward compatibility. The Duck.ai section is no longer rendered.
-     */
-    @Deprecated("Duck.ai section removed from menu")
-    fun placeDuckAiSection(atTop: Boolean) {
-        // no-op
     }
 
     private fun addTopInContextSections() {
